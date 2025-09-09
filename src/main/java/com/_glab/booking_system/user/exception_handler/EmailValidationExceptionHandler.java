@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 public class EmailValidationExceptionHandler {
 
     @ExceptionHandler(InvalidEmailException.class)
-    public ResponseEntity<Object> handleInvalidEmailException(InvalidEmailException e) {
-        ErrorResponse errorResponse = new ErrorResponse((ErrorResponseCode.USER_EMAIL_NOT_VALID) , e.getMessage());
+    public ResponseEntity<ErrorResponse> handleInvalidEmailException(InvalidEmailException e) {
+        ErrorResponse errorResponse = new ErrorResponse((ErrorResponseCode.USER_EMAIL_NOT_VALID), e.getMessage());
         return ResponseEntity.status(HttpStatus.OK).body(errorResponse);
     }
 }
