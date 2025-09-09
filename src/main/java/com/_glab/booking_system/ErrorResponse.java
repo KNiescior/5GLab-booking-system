@@ -8,7 +8,7 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 public class ErrorResponse {
-    private final ErrorResponseType TYPE = ErrorResponseType.ERROR;
+    private static final ErrorResponseType TYPE = ErrorResponseType.ERROR;
     private ErrorResponseCode status;
     private String message;
 }

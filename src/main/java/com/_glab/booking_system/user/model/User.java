@@ -1,6 +1,5 @@
 package com._glab.booking_system.user.model;
 
-import jakarta.mail.internet.InternetAddress;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
