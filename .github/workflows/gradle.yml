@@ -13,15 +13,13 @@ on:
   pull_request:
     branches: [ "main" ]
 
-env:
-  DB_USERNAME: username
-  DB_PASSWORD: password
-  DB_URL: jdbc:postgresql://postgres:5432/db_name
-  DB_DRIVER: org.postgresql.Driver
-
 jobs:
   build:
-
+    env:
+      DB_USERNAME: username
+      DB_PASSWORD: password
+      DB_URL: jdbc:postgresql://postgres:5432/db_name
+      DB_DRIVER: org.postgresql.Driver
     services:
       postgres:
         image: postgres
