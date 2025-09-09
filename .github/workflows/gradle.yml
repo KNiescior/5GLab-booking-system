@@ -45,16 +45,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
 
-      - name: Setup env
-        run: |
-          echo "DB_USERNAME=username" >> "$GITHUB_ENV"
-          echo "DB_PASSWORD=password" >> "$GITHUB_ENV"
-          echo "DB_URL=jdbc:postgresql://postgres:5432/db_name" >> "$GITHUB_ENV"
-          echo "DB_DRIVER=org.postgresql.Driver" >> "$GITHUB_ENV"
-          cp "$GITHUB_ENV" src/main/resources/.env 
-
       - name: Build with Gradle Wrapper
         run: ./gradlew build
+        env:
+          DB_USERNAME: username
+          DB_PASSWORD: password
+          DB_URL: jdbc:postgresql://postgres:5432/db_name
+          DB_DRIVER: org.postgresql.Driver
 
     # NOTE: The Gradle Wrapper is the default and recommended way to run Gradle (https://docs.gradle.org/current/userguide/gradle_wrapper.html).
     # If your project does not have the Gradle Wrapper configured, you can use the following configuration to run Gradle with a specified version.
