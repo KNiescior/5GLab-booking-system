@@ -47,10 +47,10 @@ jobs:
 
       - name: Setup env
         run: |
-          echo "DB_USERNAME: username" >> "$GITHUB_ENV"
-          echo "DB_PASSWORD: password" >> "$GITHUB_ENV"
-          echo "DB_URL: jdbc:postgresql://postgres:5432/db_name" >> "$GITHUB_ENV"
-          echo "DB_DRIVER: org.postgresql.Driver" >> "$GITHUB_ENV"
+          echo "DB_USERNAME=username" >> "$GITHUB_ENV"
+          echo "DB_PASSWORD=password" >> "$GITHUB_ENV"
+          echo "DB_URL=jdbc:postgresql://postgres:5432/db_name" >> "$GITHUB_ENV"
+          echo "DB_DRIVER=org.postgresql.Driver" >> "$GITHUB_ENV"
           cp "$GITHUB_ENV" src/main/resources/.env 
 
       - name: Build with Gradle Wrapper
