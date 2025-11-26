@@ -15,6 +15,22 @@ services:
       timeout: 5s
       retries: 5
 
+  booking_app:
+    build:
+      context: .
+      dockerfile: docker/java/Dockerfile.dev
+    depends_on:
+      booking_db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://booking_db:5432/booking
+      DB_USERNAME: booking
+      DB_PASSWORD: booking
+      DB_DRIVER: org.postgresql.Driver
+    volumes:
+      - .:/workspace
+    ports:
+      - "8080:8080"
+
 volumes:
   db_data:
-

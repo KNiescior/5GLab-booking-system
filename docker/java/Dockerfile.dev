@@ -1,0 +1,9 @@
+FROM eclipse-temurin:21-jdk
+WORKDIR /workspace
+COPY gradlew gradlew.bat settings.gradle build.gradle ./
+COPY gradle ./gradle
+RUN chmod +x gradlew
+COPY docker/java/entrypoint-dev.sh /entrypoint-dev.sh
+RUN chmod +x /entrypoint-dev.sh
+ENTRYPOINT ["/entrypoint-dev.sh"]
+
