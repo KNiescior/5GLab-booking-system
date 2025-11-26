@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: booking
       POSTGRES_PASSWORD: booking
     ports:
-      - "5431:5432"
+      - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,10 +27,15 @@ services:
       DB_USERNAME: booking
       DB_PASSWORD: booking
       DB_DRIVER: org.postgresql.Driver
+      SPRING_DEVTOOLS_RESTART_ENABLED: "true"
+      SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "true"
     volumes:
       - .:/workspace
+      - gradle_cache:/root/.gradle
     ports:
       - "8080:8080"
+      - "35729:35729"
 
 volumes:
   db_data:
+  gradle_cache:
