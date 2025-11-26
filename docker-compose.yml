@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   booking_db:
     image: postgres:16
@@ -7,7 +6,7 @@ services:
       POSTGRES_USER: booking
       POSTGRES_PASSWORD: booking
     ports:
-      - "5432:5432"
+      - "5431:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
@@ -15,24 +14,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  booking_app:
-    build:
-      context: .
-      dockerfile: docker/java/Dockerfile
-    depends_on:
-      booking_db:
-        condition: service_healthy
-    environment:
-      DB_URL: jdbc:postgresql://booking_db:5432/booking
-      DB_USERNAME: booking
-      DB_PASSWORD: booking
-      DB_DRIVER: org.postgresql.Driver
-      SPRING_PROFILES_ACTIVE: prod
-      JAVA_OPTS: -Xms256m -Xmx512m
-    ports:
-      - "8080:8080"
-    restart: unless-stopped
 
 volumes:
   db_data:
