@@ -43,8 +43,6 @@ public class User {
 
     private Boolean enabled = true;
 
-    private Boolean mustChangePassword = false;
-
     private Integer failedLoginCount = 0;
 
     private OffsetDateTime lockedUntil;

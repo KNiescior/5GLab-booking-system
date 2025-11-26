@@ -1,12 +1,8 @@
 services:
   booking_db:
     image: postgres:16
-    environment:
-      POSTGRES_DB: booking
-      POSTGRES_USER: booking
-      POSTGRES_PASSWORD: booking
-    ports:
-      - "5432:5432"
+    env_file: .env.prod
+    # No ports exposed - internal only
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
@@ -14,6 +10,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   booking_app:
     build:
@@ -22,17 +24,34 @@ services:
     depends_on:
       booking_db:
         condition: service_healthy
+    env_file: .env.prod
     environment:
-      DB_URL: jdbc:postgresql://booking_db:5432/booking
-      DB_USERNAME: booking
-      DB_PASSWORD: booking
+      DB_URL: jdbc:postgresql://booking_db:5432/${POSTGRES_DB}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_DRIVER: org.postgresql.Driver
       SPRING_PROFILES_ACTIVE: prod
       JAVA_OPTS: -Xms256m -Xmx512m
     ports:
       - "8080:8080"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+        reservations:
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   db_data:
-
