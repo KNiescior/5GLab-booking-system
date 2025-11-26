@@ -34,8 +34,27 @@ public class User {
     @Enumerated(EnumType.ORDINAL)
     private Degree degree;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "role_id")
+    private Role role;
+
     @Temporal(TemporalType.TIMESTAMP)
     private OffsetDateTime lastLogin;
+
+    private Boolean enabled = true;
+
+    private Boolean mustChangePassword = false;
+
+    private Integer failedLoginCount = 0;
+
+    private OffsetDateTime lockedUntil;
+
+    private Boolean mfaEnabled = false;
+
+    @Column(length = 128)
+    private String totpSecret;
+
+    private OffsetDateTime passwordChangedAt;
 
     @CreatedDate
     @Column(name = "createdTimestamp", updatable = false)
