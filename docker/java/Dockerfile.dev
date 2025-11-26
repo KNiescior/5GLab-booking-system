@@ -1,9 +1,15 @@
 FROM eclipse-temurin:21-jdk
 WORKDIR /workspace
+
+# Cache Gradle wrapper
 COPY gradlew gradlew.bat settings.gradle build.gradle ./
 COPY gradle ./gradle
-RUN chmod +x gradlew
+RUN chmod +x gradlew && ./gradlew --version
+
+# Install inotify-tools for file watching
+RUN apt-get update && apt-get install -y inotify-tools && rm -rf /var/lib/apt/lists/*
+
 COPY docker/java/entrypoint-dev.sh /entrypoint-dev.sh
 RUN chmod +x /entrypoint-dev.sh
-ENTRYPOINT ["/entrypoint-dev.sh"]
 
+ENTRYPOINT ["/entrypoint-dev.sh"]
