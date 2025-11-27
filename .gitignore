@@ -39,5 +39,8 @@ out/
 ### Cursor ###
 .cursor/
 
+### JWT Keys ###
+src/main/resources/keys/
+
 .env
 .env.prod
