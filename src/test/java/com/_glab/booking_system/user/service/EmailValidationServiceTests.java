@@ -4,19 +4,15 @@ import com._glab.booking_system.user.exception.InvalidEmailException;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-@SpringBootTest
 class EmailValidationServiceTests {
 
-    @Autowired
-    private EmailValidationService emailValidationService;
+    private final EmailValidationService emailValidationService = new EmailValidationService();
 
     public static Stream<Arguments> provideEmailAdressList() {
         return Stream.of(
