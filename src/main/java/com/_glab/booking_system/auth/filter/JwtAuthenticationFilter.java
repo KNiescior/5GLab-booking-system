@@ -39,9 +39,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
 
-        // Validate token and extract email (subject). If invalid, let downstream
-        // handlers deal with it (e.g. controller or exception handler).
-        String email = jwtService.extractEmail(token).orElse(null);
+        // Validate token and extract email (subject). JwtService will throw
+        // domain-specific exceptions if the token is invalid/expired, which
+        // are handled by AuthExceptionHandler.
+        String email = jwtService.extractEmail(token);
 
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);
