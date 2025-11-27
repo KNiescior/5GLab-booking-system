@@ -6,10 +6,23 @@ COPY gradlew gradlew.bat settings.gradle build.gradle ./
 COPY gradle ./gradle
 RUN chmod +x gradlew && ./gradlew --version
 
-# Install inotify-tools for file watching
-RUN apt-get update && apt-get install -y inotify-tools && rm -rf /var/lib/apt/lists/*
-
-COPY docker/java/entrypoint-dev.sh /entrypoint-dev.sh
-RUN chmod +x /entrypoint-dev.sh
+# Create entrypoint script inline (avoids CRLF issues)
+RUN printf '#!/bin/sh\n\
+\n\
+watch_and_compile() {\n\
+    LAST_HASH=""\n\
+    while true; do\n\
+        CURRENT_HASH=$(find /workspace/src -name "*.java" -exec md5sum {} \\; 2>/dev/null | sort | md5sum)\n\
+        if [ "$CURRENT_HASH" != "$LAST_HASH" ] && [ -n "$LAST_HASH" ]; then\n\
+            echo "[entrypoint] Source change detected, recompiling..."\n\
+            ./gradlew classes -x test --quiet 2>/dev/null\n\
+        fi\n\
+        LAST_HASH="$CURRENT_HASH"\n\
+        sleep 2\n\
+    done\n\
+}\n\
+\n\
+watch_and_compile &\n\
+./gradlew bootRun\n' > /entrypoint-dev.sh && chmod +x /entrypoint-dev.sh
 
 ENTRYPOINT ["/entrypoint-dev.sh"]
