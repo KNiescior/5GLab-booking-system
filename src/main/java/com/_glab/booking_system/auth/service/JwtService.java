@@ -2,8 +2,11 @@ package com._glab.booking_system.auth.service;
 
 import com._glab.booking_system.auth.config.JwtKeyProvider;
 import com._glab.booking_system.auth.config.JwtProperties;
+import com._glab.booking_system.auth.exception.ExpiredJwtTokenException;
+import com._glab.booking_system.auth.exception.InvalidJwtException;
 import com._glab.booking_system.user.model.User;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -65,49 +67,51 @@ public class JwtService {
 	}
 
 	/**
-	 * Validates a token and returns its claims if valid.
+	 * Parses and validates a token. Throws domain-specific exceptions on failure.
 	 */
-	public Optional<Claims> validateToken(String token) {
+	public Claims parseToken(String token) {
 		try {
-			Claims claims = Jwts.parser()
+			return Jwts.parser()
 					.verifyWith(keyProvider.getPublicKey())
 					.requireIssuer(jwtProperties.getIssuer())
 					.build()
 					.parseSignedClaims(token)
 					.getPayload();
-			return Optional.of(claims);
+		} catch (ExpiredJwtException e) {
+			log.debug("JWT token expired: {}", e.getMessage());
+			throw new ExpiredJwtTokenException("JWT token expired", e);
 		} catch (JwtException e) {
-			log.debug("Token validation failed: {}", e.getMessage());
-			return Optional.empty();
+			log.debug("JWT token invalid: {}", e.getMessage());
+			throw new InvalidJwtException("JWT token is invalid", e);
 		}
 	}
 
 	/**
 	 * Extracts email (subject) from a valid token.
 	 */
-	public Optional<String> extractEmail(String token) {
-		return validateToken(token).map(Claims::getSubject);
+	public String extractEmail(String token) {
+		return parseToken(token).getSubject();
 	}
 
 	/**
 	 * Extracts token ID (jti) from a valid token.
 	 */
-	public Optional<String> extractTokenId(String token) {
-		return validateToken(token).map(Claims::getId);
+	public String extractTokenId(String token) {
+		return parseToken(token).getId();
 	}
 
 	/**
 	 * Extracts user ID from a valid token.
 	 */
-	public Optional<Integer> extractUserId(String token) {
-		return validateToken(token).map(claims -> claims.get("userId", Integer.class));
+	public Integer extractUserId(String token) {
+		return parseToken(token).get("userId", Integer.class);
 	}
 
 	/**
 	 * Extracts role from a valid token.
 	 */
-	public Optional<String> extractRole(String token) {
-		return validateToken(token).map(claims -> claims.get("role", String.class));
+	public String extractRole(String token) {
+		return parseToken(token).get("role", String.class);
 	}
 
 	/**
