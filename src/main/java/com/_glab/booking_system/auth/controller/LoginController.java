@@ -12,7 +12,9 @@ import com._glab.booking_system.auth.repository.RefreshTokenRepository;
 import com._glab.booking_system.auth.request.LoginRequest;
 import com._glab.booking_system.auth.request.SetupPasswordRequest;
 import com._glab.booking_system.auth.response.LoginResponse;
+import com._glab.booking_system.auth.response.MfaChallengeResponse;
 import com._glab.booking_system.auth.service.JwtService;
+import com._glab.booking_system.auth.service.MfaService;
 import com._glab.booking_system.auth.service.PasswordSetupTokenService;
 import com._glab.booking_system.user.model.User;
 import com._glab.booking_system.user.repository.UserRepository;
@@ -45,11 +47,12 @@ public class LoginController {
     private final JwtProperties jwtProperties;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordSetupTokenService passwordSetupTokenService;
+    private final MfaService mfaService;
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> loginUser(@RequestBody LoginRequest request,
-                                                   HttpServletRequest httpRequest,
-                                                   HttpServletResponse httpResponse) {
+    public ResponseEntity<?> loginUser(@RequestBody LoginRequest request,
+                                       HttpServletRequest httpRequest,
+                                       HttpServletResponse httpResponse) {
         String email = request.getEmail();
         String password = request.getPassword();
 
@@ -108,9 +111,26 @@ public class LoginController {
             throw new AuthenticationFailedException("Invalid credentials");
         }
 
-        // Successful login: reset lockout counters and record IP
+        // Password is correct - reset lockout counters
         user.setFailedLoginCount(0);
         user.setLockedUntil(null);
+
+        // Check if MFA is required but not set up
+        if (mfaService.needsMfaSetup(user)) {
+            userRepository.save(user);
+            log.warn("MFA setup required for user {} from IP {}", email, clientIp);
+            throw new AuthenticationFailedException("MFA setup is required for your account. Please set up MFA first.");
+        }
+
+        // Check if MFA is enabled - return challenge instead of tokens
+        if (Boolean.TRUE.equals(user.getMfaEnabled())) {
+            userRepository.save(user);
+            String mfaToken = mfaService.generateMfaToken(user);
+            log.info("MFA challenge issued for user {} from IP {}", email, clientIp);
+            return ResponseEntity.ok(new MfaChallengeResponse(mfaToken));
+        }
+
+        // No MFA - complete login
         user.setLastLogin(now);
         user.setLastLoginIp(clientIp);
         userRepository.save(user);
