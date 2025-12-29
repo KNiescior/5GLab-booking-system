@@ -1,15 +1,22 @@
 spring:
   datasource:
-    url: ${TEST_DB_URL:jdbc:postgresql://localhost:5432/booking_test}
-    username: ${TEST_DB_USERNAME:postgres}
-    password: ${TEST_DB_PASSWORD:postgres}
+    url: ${TEST_DB_URL:jdbc:postgresql://localhost:5432/booking}
+    username: ${TEST_DB_USERNAME:booking}
+    password: ${TEST_DB_PASSWORD:booking}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create-drop
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
+jwt:
+  keys:
+    enabled: false
+  access-token-expiry: 15m
+  refresh-token-expiry: 7d
+  issuer: booking-system-test
 
 
 
