@@ -19,6 +19,7 @@ import com._glab.booking_system.user.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +36,7 @@ import java.time.ZoneOffset;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class LoginController {
 
     private final UserRepository userRepository;
@@ -51,15 +53,22 @@ public class LoginController {
         String email = request.getEmail();
         String password = request.getPassword();
 
+        String clientIp = getClientIp(httpRequest);
+
         if (email == null || email.isBlank() || password == null || password.isBlank()) {
+            log.warn("Login attempt with empty credentials from IP {}", clientIp);
             throw new AuthenticationFailedException("Invalid credentials");
         }
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AuthenticationFailedException("Invalid credentials"));
+                .orElseThrow(() -> {
+                    log.warn("Login attempt for unknown email {} from IP {}", email, clientIp);
+                    return new AuthenticationFailedException("Invalid credentials");
+                });
 
         // Account enabled check
         if (!Boolean.TRUE.equals(user.getEnabled())) {
+            log.warn("Login attempt for disabled account {} from IP {}", email, clientIp);
             throw new AccountDisabledException("Account is disabled");
         }
 
@@ -67,6 +76,7 @@ public class LoginController {
 
         // Lockout check
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
+            log.warn("Login attempt for locked account {} from IP {}", email, clientIp);
             throw new AccountLockedException("Account is locked until " + user.getLockedUntil());
         }
 
@@ -86,19 +96,26 @@ public class LoginController {
             // Tiered lockout: 3 fails -> 10 minutes, 6 fails -> 30 minutes
             if (failed >= 6) {
                 user.setLockedUntil(now.plusMinutes(30));
+                log.warn("Account {} locked for 30 minutes after {} failed attempts from IP {}", email, failed, clientIp);
             } else if (failed >= 3) {
                 user.setLockedUntil(now.plusMinutes(10));
+                log.warn("Account {} locked for 10 minutes after {} failed attempts from IP {}", email, failed, clientIp);
+            } else {
+                log.warn("Failed login attempt {} for {} from IP {}", failed, email, clientIp);
             }
 
             userRepository.save(user);
             throw new AuthenticationFailedException("Invalid credentials");
         }
 
-        // Successful login: reset lockout counters
+        // Successful login: reset lockout counters and record IP
         user.setFailedLoginCount(0);
         user.setLockedUntil(null);
         user.setLastLogin(now);
+        user.setLastLoginIp(clientIp);
         userRepository.save(user);
+
+        log.info("User {} logged in from IP {}", user.getEmail(), clientIp);
 
         // Generate tokens
         String accessToken = jwtService.generateAccessToken(user);
@@ -135,9 +152,13 @@ public class LoginController {
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refreshToken(
             @CookieValue(name = "refreshToken", required = false) String refreshTokenCookie,
+            HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
 
+        String clientIp = getClientIp(httpRequest);
+
         if (refreshTokenCookie == null || refreshTokenCookie.isBlank()) {
+            log.warn("Token refresh attempt without cookie from IP {}", clientIp);
             throw new InvalidRefreshTokenException("Refresh token is missing");
         }
 
@@ -146,22 +167,28 @@ public class LoginController {
 
         // Look up refresh token in DB
         RefreshToken storedToken = refreshTokenRepository.findByTokenId(jti)
-                .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token not found"));
+                .orElseThrow(() -> {
+                    log.warn("Token refresh attempt with unknown token from IP {}", clientIp);
+                    return new InvalidRefreshTokenException("Refresh token not found");
+                });
+
+        User user = storedToken.getUser();
 
         // Check if token is active
         if (!storedToken.isActive()) {
             if (storedToken.getRevokedAt() != null && storedToken.getReplacedByTokenId() != null) {
                 // Token was already rotated - possible reuse attack
+                log.error("SECURITY: Refresh token reuse detected for user {} from IP {}", user.getEmail(), clientIp);
                 throw new RefreshTokenReuseException("Refresh token reuse detected");
             }
             // Token expired
+            log.debug("Expired token refresh attempt for user {} from IP {}", user.getEmail(), clientIp);
             throw new RefreshTokenExpiredException("Refresh token has expired");
         }
 
-        User user = storedToken.getUser();
-
         // Check if user is still enabled
         if (!Boolean.TRUE.equals(user.getEnabled())) {
+            log.warn("Token refresh attempt for disabled account {} from IP {}", user.getEmail(), clientIp);
             throw new AccountDisabledException("Account is disabled");
         }
 
@@ -179,6 +206,8 @@ public class LoginController {
         newRefreshToken.setTokenId(newRefreshResult.jti());
         newRefreshToken.setExpiresAt(OffsetDateTime.ofInstant(newRefreshResult.expiresAt().toInstant(), ZoneOffset.UTC));
         refreshTokenRepository.save(newRefreshToken);
+
+        log.debug("Token refreshed for user {} from IP {}", user.getEmail(), clientIp);
 
         // Set new refresh token cookie
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", newRefreshResult.token())
@@ -203,7 +232,10 @@ public class LoginController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
             @CookieValue(name = "refreshToken", required = false) String refreshTokenCookie,
+            HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
+
+        String clientIp = getClientIp(httpRequest);
 
         // Revoke the refresh token if present
         if (refreshTokenCookie != null && !refreshTokenCookie.isBlank()) {
@@ -213,10 +245,11 @@ public class LoginController {
                     if (token.getRevokedAt() == null) {
                         token.setRevokedAt(OffsetDateTime.now(ZoneOffset.UTC));
                         refreshTokenRepository.save(token);
+                        log.info("User {} logged out from IP {}", token.getUser().getEmail(), clientIp);
                     }
                 });
-            } catch (Exception ignored) {
-                // Token parsing failed - just clear the cookie
+            } catch (Exception e) {
+                log.debug("Logout with invalid token from IP {}", clientIp);
             }
         }
 
@@ -236,15 +269,19 @@ public class LoginController {
     @PostMapping("/setup-password")
     public ResponseEntity<LoginResponse> setupPassword(
             @RequestBody SetupPasswordRequest request,
+            HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
 
+        String clientIp = getClientIp(httpRequest);
         String token = request.getToken();
         String newPassword = request.getNewPassword();
 
         if (token == null || token.isBlank()) {
+            log.warn("Password setup attempt without token from IP {}", clientIp);
             throw new AuthenticationFailedException("Token is required");
         }
         if (newPassword == null || newPassword.isBlank()) {
+            log.warn("Password setup attempt without password from IP {}", clientIp);
             throw new AuthenticationFailedException("New password is required");
         }
 
@@ -257,7 +294,10 @@ public class LoginController {
         user.setPasswordChangedAt(OffsetDateTime.now(ZoneOffset.UTC));
         user.setFailedLoginCount(0);
         user.setLockedUntil(null);
+        user.setLastLoginIp(clientIp);
         userRepository.save(user);
+
+        log.info("Password setup completed for user {} from IP {}", user.getEmail(), clientIp);
 
         // Auto-login: generate tokens
         String accessToken = jwtService.generateAccessToken(user);
@@ -288,5 +328,18 @@ public class LoginController {
         );
 
         return ResponseEntity.ok(new LoginResponse(accessToken, loggedInUser));
+    }
+
+    /**
+     * Extracts the client IP address from the request.
+     * Handles X-Forwarded-For header for clients behind proxies/load balancers.
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+            // X-Forwarded-For can contain multiple IPs; first one is the original client
+            return xForwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

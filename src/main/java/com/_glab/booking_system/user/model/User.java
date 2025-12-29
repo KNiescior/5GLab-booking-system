@@ -41,6 +41,9 @@ public class User {
     @Temporal(TemporalType.TIMESTAMP)
     private OffsetDateTime lastLogin;
 
+    @Column(length = 45)
+    private String lastLoginIp;
+
     private Boolean enabled = true;
 
     private Integer failedLoginCount = 0;
