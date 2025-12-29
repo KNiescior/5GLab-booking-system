@@ -1,6 +1,7 @@
 package com._glab.booking_system.auth;
 
 import com._glab.booking_system.auth.config.TestJwtConfig;
+import com._glab.booking_system.auth.config.TestMailConfig;
 import com._glab.booking_system.auth.model.PasswordSetupToken;
 import com._glab.booking_system.auth.model.RefreshToken;
 import com._glab.booking_system.auth.model.TokenPurpose;
@@ -43,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Testcontainers
-@Import(TestJwtConfig.class)
+@Import({TestJwtConfig.class, TestMailConfig.class})
 class AuthIntegrationTest {
 
     // Testcontainers works on Linux CI, but has issues with Docker Desktop + WSL2 on Windows
