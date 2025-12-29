@@ -96,7 +96,7 @@ class AuthIntegrationTest {
 
         // Create role
         userRole = new Role();
-        userRole.setName(RoleName.USER);
+        userRole.setName(RoleName.PROFESSOR);
         userRole = roleRepository.save(userRole);
 
         // Create test user
@@ -125,7 +125,7 @@ class AuthIntegrationTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.accessToken").isNotEmpty())
                     .andExpect(jsonPath("$.user.email").value("test@example.com"))
-                    .andExpect(jsonPath("$.user.role").value("USER"))
+                    .andExpect(jsonPath("$.user.role").value("PROFESSOR"))
                     .andExpect(cookie().exists("refreshToken"))
                     .andExpect(cookie().httpOnly("refreshToken", true));
         }
