@@ -1,10 +1,13 @@
+# Development Docker Compose
+# Copy .env.example to .env and set your credentials before running
+
 services:
   booking_db:
     image: postgres:16
     environment:
-      POSTGRES_DB: booking
-      POSTGRES_USER: booking
-      POSTGRES_PASSWORD: booking
+      POSTGRES_DB: ${POSTGRES_DB:-booking}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env file}
     ports:
       - "5432:5432"
     volumes:
@@ -23,9 +26,9 @@ services:
       booking_db:
         condition: service_healthy
     environment:
-      DB_URL: jdbc:postgresql://booking_db:5432/booking
-      DB_USERNAME: booking
-      DB_PASSWORD: booking
+      DB_URL: jdbc:postgresql://booking_db:5432/${POSTGRES_DB:-booking}
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env file}
       DB_DRIVER: org.postgresql.Driver
       SPRING_DEVTOOLS_RESTART_ENABLED: "true"
       SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "true"
