@@ -1,6 +1,7 @@
 package com._glab.booking_system.auth.controller;
 
 import com._glab.booking_system.auth.config.JwtProperties;
+import com._glab.booking_system.auth.exception.*;
 import com._glab.booking_system.auth.model.RefreshToken;
 import com._glab.booking_system.auth.repository.RefreshTokenRepository;
 import com._glab.booking_system.auth.request.MfaDisableRequest;
@@ -59,10 +60,11 @@ public class MfaController {
     @PostMapping("/setup")
     public ResponseEntity<MfaSetupResponse> setupMfa(@AuthenticationPrincipal UserDetails userDetails) {
         User user = userRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new AuthenticationFailedException("User not found"));
 
         if (Boolean.TRUE.equals(user.getMfaEnabled())) {
-            throw new RuntimeException("MFA is already enabled");
+            log.warn("MFA setup attempt for user {} who already has MFA enabled", user.getEmail());
+            throw new MfaAlreadyEnabledException("MFA is already enabled");
         }
 
         String secret = mfaService.generateSecret();
@@ -84,15 +86,17 @@ public class MfaController {
             @RequestBody MfaSetupVerifyRequest request) {
 
         User user = userRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new AuthenticationFailedException("User not found"));
 
         if (Boolean.TRUE.equals(user.getMfaEnabled())) {
-            throw new RuntimeException("MFA is already enabled");
+            log.warn("MFA setup verify attempt for user {} who already has MFA enabled", user.getEmail());
+            throw new MfaAlreadyEnabledException("MFA is already enabled");
         }
 
         // Verify the TOTP code with the provided secret
         if (!mfaService.verifyTotp(request.getSecret(), request.getCode())) {
-            throw new RuntimeException("Invalid verification code");
+            log.warn("MFA setup verification failed for user {} - invalid TOTP code", user.getEmail());
+            throw new InvalidMfaCodeException("Invalid verification code");
         }
 
         // Generate backup codes
@@ -132,11 +136,11 @@ public class MfaController {
             claims = mfaService.parseMfaToken(request.getMfaToken());
         } catch (Exception e) {
             log.warn("Invalid MFA token from IP {}", clientIp);
-            throw new RuntimeException("Invalid or expired MFA token");
+            throw new InvalidMfaTokenException("Invalid or expired MFA token");
         }
 
         User user = userRepository.findById(claims.userId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new AuthenticationFailedException("User not found"));
 
         boolean codeValid = switch (request.getCodeType()) {
             case TOTP -> mfaService.verifyTotp(user.getTotpSecret(), request.getCode());
@@ -145,8 +149,8 @@ public class MfaController {
         };
 
         if (!codeValid) {
-            log.warn("Invalid MFA code for user {} from IP {}", user.getEmail(), clientIp);
-            throw new RuntimeException("Invalid verification code");
+            log.warn("Invalid MFA code (type={}) for user {} from IP {}", request.getCodeType(), user.getEmail(), clientIp);
+            throw new MfaVerificationFailedException("Invalid verification code");
         }
 
         // MFA verified - complete login
@@ -196,22 +200,24 @@ public class MfaController {
         try {
             claims = mfaService.parseMfaToken(mfaToken);
         } catch (Exception e) {
-            throw new RuntimeException("Invalid or expired MFA token");
+            log.warn("Invalid MFA token in email-code request");
+            throw new InvalidMfaTokenException("Invalid or expired MFA token");
         }
 
         User user = userRepository.findById(claims.userId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new AuthenticationFailedException("User not found"));
 
         boolean sent = emailOtpService.generateAndSendOtp(user);
 
         if (!sent) {
+            log.debug("Email OTP rate-limited for user {}", user.getEmail());
             return ResponseEntity.ok(Map.of(
                     "sent", false,
                     "message", "Please wait before requesting another code"
             ));
         }
 
-        log.info("Email OTP sent to user {}", user.getEmail());
+        log.info("Email OTP requested and sent to user {}", user.getEmail());
 
         return ResponseEntity.ok(Map.of(
                 "sent", true,
@@ -229,21 +235,24 @@ public class MfaController {
             @RequestBody MfaDisableRequest request) {
 
         User user = userRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new AuthenticationFailedException("User not found"));
 
         // Check if MFA is required for this role
         if (mfaService.isMfaRequired(user)) {
             RoleName role = user.getRole().getName();
-            throw new RuntimeException("MFA cannot be disabled for " + role + " accounts");
+            log.warn("MFA disable attempt blocked for user {} (role {} requires MFA)", user.getEmail(), role);
+            throw new MfaRequiredException("MFA cannot be disabled for " + role + " accounts");
         }
 
         if (!Boolean.TRUE.equals(user.getMfaEnabled())) {
-            throw new RuntimeException("MFA is not enabled");
+            log.warn("MFA disable attempt for user {} who doesn't have MFA enabled", user.getEmail());
+            throw new MfaNotEnabledException("MFA is not enabled");
         }
 
         // Verify current TOTP code
         if (!mfaService.verifyTotp(user.getTotpSecret(), request.getCode())) {
-            throw new RuntimeException("Invalid verification code");
+            log.warn("MFA disable attempt failed for user {} - invalid TOTP code", user.getEmail());
+            throw new InvalidMfaCodeException("Invalid verification code");
         }
 
         // Disable MFA
@@ -268,7 +277,9 @@ public class MfaController {
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> getMfaStatus(@AuthenticationPrincipal UserDetails userDetails) {
         User user = userRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new AuthenticationFailedException("User not found"));
+
+        log.debug("MFA status check for user {}", user.getEmail());
 
         return ResponseEntity.ok(Map.of(
                 "mfaEnabled", Boolean.TRUE.equals(user.getMfaEnabled()),

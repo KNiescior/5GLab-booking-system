@@ -5,6 +5,7 @@ import com._glab.booking_system.auth.exception.AccountDisabledException;
 import com._glab.booking_system.auth.exception.AccountLockedException;
 import com._glab.booking_system.auth.exception.AuthenticationFailedException;
 import com._glab.booking_system.auth.exception.InvalidRefreshTokenException;
+import com._glab.booking_system.auth.exception.MfaSetupRequiredException;
 import com._glab.booking_system.auth.exception.RefreshTokenExpiredException;
 import com._glab.booking_system.auth.exception.RefreshTokenReuseException;
 import com._glab.booking_system.auth.model.RefreshToken;
@@ -119,7 +120,7 @@ public class LoginController {
         if (mfaService.needsMfaSetup(user)) {
             userRepository.save(user);
             log.warn("MFA setup required for user {} from IP {}", email, clientIp);
-            throw new AuthenticationFailedException("MFA setup is required for your account. Please set up MFA first.");
+            throw new MfaSetupRequiredException("MFA setup is required for your account. Please set up MFA first.");
         }
 
         // Check if MFA is enabled - return challenge instead of tokens

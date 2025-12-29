@@ -61,7 +61,9 @@ public class MfaService {
             return false;
         }
         RoleName role = user.getRole().getName();
-        return role == RoleName.ADMIN || role == RoleName.LAB_MANAGER;
+        boolean required = role == RoleName.ADMIN || role == RoleName.LAB_MANAGER;
+        log.trace("MFA required check for user {} (role={}): {}", user.getEmail(), role, required);
+        return required;
     }
 
     /**
@@ -69,7 +71,11 @@ public class MfaService {
      * Returns true if MFA is required by role but not yet enabled.
      */
     public boolean needsMfaSetup(User user) {
-        return isMfaRequired(user) && !Boolean.TRUE.equals(user.getMfaEnabled());
+        boolean needsSetup = isMfaRequired(user) && !Boolean.TRUE.equals(user.getMfaEnabled());
+        if (needsSetup) {
+            log.debug("User {} needs MFA setup (role requires MFA but not enabled)", user.getEmail());
+        }
+        return needsSetup;
     }
 
     // ==================== TOTP Secret Management ====================
@@ -78,7 +84,9 @@ public class MfaService {
      * Generate a new TOTP secret for MFA setup.
      */
     public String generateSecret() {
-        return secretGenerator.generate();
+        String secret = secretGenerator.generate();
+        log.debug("Generated new TOTP secret");
+        return secret;
     }
 
     /**
@@ -132,9 +140,12 @@ public class MfaService {
      */
     public boolean verifyTotp(String secret, String code) {
         if (secret == null || code == null) {
+            log.debug("TOTP verification failed: secret or code is null");
             return false;
         }
-        return codeVerifier.isValidCode(secret, code);
+        boolean valid = codeVerifier.isValidCode(secret, code);
+        log.debug("TOTP verification result: {}", valid ? "success" : "failed");
+        return valid;
     }
 
     // ==================== Backup Codes ====================
@@ -153,6 +164,7 @@ public class MfaService {
             hashedCodes.add(passwordEncoder.encode(code));
         }
 
+        log.debug("Generated {} backup codes", BACKUP_CODE_COUNT);
         return new BackupCodesResult(plainCodes, hashedCodes);
     }
 
@@ -181,6 +193,7 @@ public class MfaService {
      */
     public int verifyBackupCode(String code, List<String> hashedCodes) {
         if (code == null || hashedCodes == null) {
+            log.debug("Backup code verification failed: code or hashedCodes is null");
             return -1;
         }
 
@@ -189,10 +202,12 @@ public class MfaService {
         for (int i = 0; i < hashedCodes.size(); i++) {
             String hash = hashedCodes.get(i);
             if (hash != null && passwordEncoder.matches(normalizedCode, hash)) {
+                log.debug("Backup code verified at index {}", i);
                 return i;
             }
         }
         
+        log.debug("Backup code verification failed: no matching code found");
         return -1;
     }
 
@@ -206,7 +221,7 @@ public class MfaService {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + MFA_TOKEN_EXPIRY.toMillis());
 
-        return Jwts.builder()
+        String token = Jwts.builder()
                 .subject(user.getEmail())
                 .claim("userId", user.getId())
                 .claim("mfaPending", true)
@@ -216,6 +231,10 @@ public class MfaService {
                 .issuer(MFA_TOKEN_ISSUER)
                 .signWith(keyProvider.getPrivateKey())
                 .compact();
+
+        log.debug("Generated MFA token for user {} (expires in {} minutes)", 
+                user.getEmail(), MFA_TOKEN_EXPIRY.toMinutes());
+        return token;
     }
 
     /**
