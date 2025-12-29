@@ -33,7 +33,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         boolean credentialsNonExpired = true;
 
         Role role = user.getRole();
-        String roleName = role != null ? role.getName().name() : "USER";
+        String roleName = role != null ? role.getName().name() : "PROFESSOR";
 
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getEmail())

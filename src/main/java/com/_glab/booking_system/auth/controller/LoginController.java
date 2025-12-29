@@ -142,7 +142,7 @@ public class LoginController {
         LoginResponse.LoggedInUser loggedInUser = new LoginResponse.LoggedInUser(
                 user.getId(),
                 user.getEmail(),
-                user.getRole() != null ? user.getRole().getName().name() : "USER"
+                user.getRole() != null ? user.getRole().getName().name() : "PROFESSOR"
         );
         LoginResponse responseBody = new LoginResponse(accessToken, loggedInUser);
 
@@ -223,7 +223,7 @@ public class LoginController {
         LoginResponse.LoggedInUser loggedInUser = new LoginResponse.LoggedInUser(
                 user.getId(),
                 user.getEmail(),
-                user.getRole() != null ? user.getRole().getName().name() : "USER"
+                user.getRole() != null ? user.getRole().getName().name() : "PROFESSOR"
         );
 
         return ResponseEntity.ok(new LoginResponse(newAccessToken, loggedInUser));
@@ -324,7 +324,7 @@ public class LoginController {
         LoginResponse.LoggedInUser loggedInUser = new LoginResponse.LoggedInUser(
                 user.getId(),
                 user.getEmail(),
-                user.getRole() != null ? user.getRole().getName().name() : "USER"
+                user.getRole() != null ? user.getRole().getName().name() : "PROFESSOR"
         );
 
         return ResponseEntity.ok(new LoginResponse(accessToken, loggedInUser));

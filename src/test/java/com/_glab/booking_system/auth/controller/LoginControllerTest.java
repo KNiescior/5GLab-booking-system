@@ -77,7 +77,7 @@ class LoginControllerTest {
     void setUp() {
         testRole = new Role();
         testRole.setId(1);
-        testRole.setName(RoleName.USER);
+        testRole.setName(RoleName.PROFESSOR);
 
         testUser = new User();
         testUser.setId(1);

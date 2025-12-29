@@ -55,6 +55,19 @@ public class User {
     @Column(length = 128)
     private String totpSecret;
 
+    /**
+     * When MFA was enforced for this user (null if not enforced yet).
+     * Used to track when admins/lab managers completed required MFA setup.
+     */
+    private OffsetDateTime mfaEnforcedAt;
+
+    /**
+     * JSON array of BCrypt-hashed backup codes for MFA recovery.
+     * Example: ["$2a$10$...", "$2a$10$..."]
+     */
+    @Column(columnDefinition = "TEXT")
+    private String backupCodes;
+
     private OffsetDateTime passwordChangedAt;
 
     @CreatedDate

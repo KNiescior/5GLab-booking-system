@@ -43,7 +43,7 @@ class UserRepositoryTests {
 	@Test
 	void findByEmail_and_findByUsername_work() {
 		Role role = new Role();
-		role.setName(RoleName.USER);
+		role.setName(RoleName.PROFESSOR);
 		em.persist(role);
 
 		User u = new User();
