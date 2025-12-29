@@ -9,6 +9,7 @@ import com._glab.booking_system.auth.repository.RefreshTokenRepository;
 import com._glab.booking_system.auth.request.LoginRequest;
 import com._glab.booking_system.auth.response.LoginResponse;
 import com._glab.booking_system.auth.service.JwtService;
+import com._glab.booking_system.auth.service.MfaService;
 import com._glab.booking_system.auth.service.PasswordSetupTokenService;
 import com._glab.booking_system.user.model.Role;
 import com._glab.booking_system.user.model.RoleName;
@@ -62,6 +63,9 @@ class LoginControllerTest {
     private PasswordSetupTokenService passwordSetupTokenService;
 
     @Mock
+    private MfaService mfaService;
+
+    @Mock
     private HttpServletRequest httpRequest;
 
     @Mock
@@ -101,19 +105,21 @@ class LoginControllerTest {
             LoginRequest request = new LoginRequest("test@example.com", "password");
             when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
             when(passwordEncoder.matches("password", "encodedPassword")).thenReturn(true);
+            when(mfaService.needsMfaSetup(testUser)).thenReturn(false);
             when(jwtService.generateAccessToken(testUser)).thenReturn("access-token");
             when(jwtService.generateRefreshToken(testUser)).thenReturn(
                     new JwtService.RefreshTokenResult("refresh-token", "jti-123", new Date())
             );
 
             // When
-            ResponseEntity<LoginResponse> response = loginController.loginUser(request, httpRequest, httpResponse);
+            ResponseEntity<?> response = loginController.loginUser(request, httpRequest, httpResponse);
 
             // Then
             assertThat(response.getStatusCode().value()).isEqualTo(200);
-            assertThat(response.getBody()).isNotNull();
-            assertThat(response.getBody().getAccessToken()).isEqualTo("access-token");
-            assertThat(response.getBody().getUser().getEmail()).isEqualTo("test@example.com");
+            assertThat(response.getBody()).isInstanceOf(LoginResponse.class);
+            LoginResponse loginResponse = (LoginResponse) response.getBody();
+            assertThat(loginResponse.getAccessToken()).isEqualTo("access-token");
+            assertThat(loginResponse.getUser().getEmail()).isEqualTo("test@example.com");
 
             // Verify lockout counters reset
             ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
@@ -130,6 +136,7 @@ class LoginControllerTest {
             LoginRequest request = new LoginRequest("test@example.com", "password");
             when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
             when(passwordEncoder.matches("password", "encodedPassword")).thenReturn(true);
+            when(mfaService.needsMfaSetup(testUser)).thenReturn(false);
             when(jwtService.generateAccessToken(testUser)).thenReturn("access-token");
             when(jwtService.generateRefreshToken(testUser)).thenReturn(
                     new JwtService.RefreshTokenResult("refresh-token", "jti-123", new Date())
