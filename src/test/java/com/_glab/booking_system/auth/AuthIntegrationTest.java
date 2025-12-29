@@ -46,6 +46,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(TestJwtConfig.class)
 class AuthIntegrationTest {
 
+    // Testcontainers works on Linux CI, but has issues with Docker Desktop + WSL2 on Windows
+    // Local Windows: run unit tests only, or use CI for integration tests
+
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
 

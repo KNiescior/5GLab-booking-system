@@ -12,6 +12,8 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 jwt:
+  keys:
+    enabled: false
   access-token-expiry: 15m
   refresh-token-expiry: 7d
   issuer: booking-system-test

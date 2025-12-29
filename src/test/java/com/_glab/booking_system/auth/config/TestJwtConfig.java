@@ -2,7 +2,6 @@ package com._glab.booking_system.auth.config;
 
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -26,34 +25,22 @@ public class TestJwtConfig {
     }
 
     @Bean
-    @Primary
-    public JwtKeyProvider testJwtKeyProvider() {
-        return new TestJwtKeyProvider();
-    }
+    public JwtKeyProvider jwtKeyProvider() {
+        return new JwtKeyProvider(null, null) {
+            @Override
+            public void init() {
+                // Skip file loading - use generated keys
+            }
 
-    /**
-     * Test implementation that uses programmatically generated keys.
-     * Overrides init() to prevent file loading from parent class.
-     */
-    public static class TestJwtKeyProvider extends JwtKeyProvider {
+            @Override
+            public PrivateKey getPrivateKey() {
+                return KEY_PAIR.getPrivate();
+            }
 
-        public TestJwtKeyProvider() {
-            super(null, null);
-        }
-
-        @Override
-        public void init() {
-            // Do nothing - we use programmatically generated keys
-        }
-
-        @Override
-        public PrivateKey getPrivateKey() {
-            return KEY_PAIR.getPrivate();
-        }
-
-        @Override
-        public PublicKey getPublicKey() {
-            return KEY_PAIR.getPublic();
-        }
+            @Override
+            public PublicKey getPublicKey() {
+                return KEY_PAIR.getPublic();
+            }
+        };
     }
 }
