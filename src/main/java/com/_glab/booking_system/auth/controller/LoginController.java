@@ -10,8 +10,10 @@ import com._glab.booking_system.auth.exception.RefreshTokenReuseException;
 import com._glab.booking_system.auth.model.RefreshToken;
 import com._glab.booking_system.auth.repository.RefreshTokenRepository;
 import com._glab.booking_system.auth.request.LoginRequest;
+import com._glab.booking_system.auth.request.SetupPasswordRequest;
 import com._glab.booking_system.auth.response.LoginResponse;
 import com._glab.booking_system.auth.service.JwtService;
+import com._glab.booking_system.auth.service.PasswordSetupTokenService;
 import com._glab.booking_system.user.model.User;
 import com._glab.booking_system.user.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,6 +42,7 @@ public class LoginController {
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordSetupTokenService passwordSetupTokenService;
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> loginUser(@RequestBody LoginRequest request,
@@ -228,5 +231,62 @@ public class LoginController {
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, clearCookie.toString());
 
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/setup-password")
+    public ResponseEntity<LoginResponse> setupPassword(
+            @RequestBody SetupPasswordRequest request,
+            HttpServletResponse httpResponse) {
+
+        String token = request.getToken();
+        String newPassword = request.getNewPassword();
+
+        if (token == null || token.isBlank()) {
+            throw new AuthenticationFailedException("Token is required");
+        }
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new AuthenticationFailedException("New password is required");
+        }
+
+        // Validate and consume the token (throws InvalidPasswordSetupTokenException or ExpiredPasswordSetupTokenException)
+        User user = passwordSetupTokenService.validateAndConsumeToken(token);
+
+        // Set the new password and enable the account
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setEnabled(true);
+        user.setPasswordChangedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        user.setFailedLoginCount(0);
+        user.setLockedUntil(null);
+        userRepository.save(user);
+
+        // Auto-login: generate tokens
+        String accessToken = jwtService.generateAccessToken(user);
+        JwtService.RefreshTokenResult refreshResult = jwtService.generateRefreshToken(user);
+
+        // Persist refresh token
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUser(user);
+        refreshToken.setTokenId(refreshResult.jti());
+        refreshToken.setExpiresAt(OffsetDateTime.ofInstant(refreshResult.expiresAt().toInstant(), ZoneOffset.UTC));
+        refreshTokenRepository.save(refreshToken);
+
+        // Set refresh token cookie
+        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshResult.token())
+                .httpOnly(true)
+                .secure(false)
+                .path("/api/v1/auth/refresh")
+                .maxAge(jwtProperties.getRefreshTokenExpiry().toSeconds())
+                .sameSite("Strict")
+                .build();
+        httpResponse.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+
+        // Build response
+        LoginResponse.LoggedInUser loggedInUser = new LoginResponse.LoggedInUser(
+                user.getId(),
+                user.getEmail(),
+                user.getRole() != null ? user.getRole().getName().name() : "USER"
+        );
+
+        return ResponseEntity.ok(new LoginResponse(accessToken, loggedInUser));
     }
 }

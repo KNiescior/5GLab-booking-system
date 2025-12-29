@@ -1,5 +1,7 @@
 package com._glab.booking_system.auth.service;
 
+import com._glab.booking_system.auth.exception.ExpiredPasswordSetupTokenException;
+import com._glab.booking_system.auth.exception.InvalidPasswordSetupTokenException;
 import com._glab.booking_system.auth.model.PasswordSetupToken;
 import com._glab.booking_system.auth.model.TokenPurpose;
 import com._glab.booking_system.auth.repository.PasswordSetupTokenRepository;
@@ -13,7 +15,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.OffsetDateTime;
 import java.util.Base64;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -50,33 +51,27 @@ public class PasswordSetupTokenService {
 	}
 
 	/**
-	 * Validates a raw token and returns the associated entity if valid.
-	 */
-	@Transactional(readOnly = true)
-	public Optional<PasswordSetupToken> validateToken(String rawToken) {
-		String hash = hashToken(rawToken);
-		return tokenRepository.findByTokenHash(hash)
-				.filter(PasswordSetupToken::isValid);
-	}
-
-	/**
-	 * Consumes a token (marks it as used).
-	 * Returns the associated user if successful.
+	 * Validates and consumes a token, throwing specific exceptions on failure.
+	 * Returns the associated user on success.
 	 */
 	@Transactional
-	public Optional<User> consumeToken(String rawToken) {
+	public User validateAndConsumeToken(String rawToken) {
 		String hash = hashToken(rawToken);
-		Optional<PasswordSetupToken> tokenOpt = tokenRepository.findByTokenHash(hash);
+		PasswordSetupToken token = tokenRepository.findByTokenHash(hash)
+				.orElseThrow(() -> new InvalidPasswordSetupTokenException("Password setup token not found"));
 
-		if (tokenOpt.isEmpty() || !tokenOpt.get().isValid()) {
-			return Optional.empty();
+		if (token.getUsedAt() != null) {
+			throw new InvalidPasswordSetupTokenException("Password setup token has already been used");
 		}
 
-		PasswordSetupToken token = tokenOpt.get();
+		if (OffsetDateTime.now().isAfter(token.getExpiresAt())) {
+			throw new ExpiredPasswordSetupTokenException("Password setup token has expired");
+		}
+
 		token.markUsed();
 		tokenRepository.save(token);
 
-		return Optional.of(token.getUser());
+		return token.getUser();
 	}
 
 	/**
