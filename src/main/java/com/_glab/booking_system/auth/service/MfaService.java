@@ -153,6 +153,7 @@ public class MfaService {
     /**
      * Generate backup codes for MFA recovery.
      * Returns a list of plain-text codes (to show to user) and hashed codes (to store).
+     * The hashed codes are normalized (uppercase, no dashes) for consistent verification.
      */
     public BackupCodesResult generateBackupCodes() {
         List<String> plainCodes = new ArrayList<>();
@@ -161,7 +162,9 @@ public class MfaService {
         for (int i = 0; i < BACKUP_CODE_COUNT; i++) {
             String code = generateBackupCode();
             plainCodes.add(code);
-            hashedCodes.add(passwordEncoder.encode(code));
+            // Hash the normalized version for consistent verification
+            String normalized = code.toUpperCase().replace("-", "");
+            hashedCodes.add(passwordEncoder.encode(normalized));
         }
 
         log.debug("Generated {} backup codes", BACKUP_CODE_COUNT);

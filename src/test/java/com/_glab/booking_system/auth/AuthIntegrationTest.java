@@ -5,10 +5,14 @@ import com._glab.booking_system.auth.config.TestMailConfig;
 import com._glab.booking_system.auth.model.PasswordSetupToken;
 import com._glab.booking_system.auth.model.RefreshToken;
 import com._glab.booking_system.auth.model.TokenPurpose;
+import com._glab.booking_system.auth.repository.EmailOtpRepository;
 import com._glab.booking_system.auth.repository.PasswordSetupTokenRepository;
 import com._glab.booking_system.auth.repository.RefreshTokenRepository;
 import com._glab.booking_system.auth.request.LoginRequest;
+import com._glab.booking_system.auth.request.MfaVerifyRequest;
 import com._glab.booking_system.auth.request.SetupPasswordRequest;
+import com._glab.booking_system.auth.model.MfaCodeType;
+import com._glab.booking_system.auth.service.MfaService;
 import com._glab.booking_system.auth.service.PasswordSetupTokenService;
 import com._glab.booking_system.user.model.Role;
 import com._glab.booking_system.user.model.RoleName;
@@ -84,23 +88,35 @@ class AuthIntegrationTest {
     @Autowired
     private PasswordSetupTokenService passwordSetupTokenService;
 
+    @Autowired
+    private MfaService mfaService;
+
+    @Autowired
+    private EmailOtpRepository emailOtpRepository;
+
     private User testUser;
     private Role userRole;
+    private Role adminRole;
 
     @BeforeEach
     void setUp() {
         // Clean up
+        emailOtpRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         passwordSetupTokenRepository.deleteAll();
         userRepository.deleteAll();
         roleRepository.deleteAll();
 
-        // Create role
+        // Create roles
         userRole = new Role();
         userRole.setName(RoleName.PROFESSOR);
         userRole = roleRepository.save(userRole);
 
-        // Create test user
+        adminRole = new Role();
+        adminRole.setName(RoleName.ADMIN);
+        adminRole = roleRepository.save(adminRole);
+
+        // Create test user (Professor - MFA optional)
         testUser = new User();
         testUser.setEmail("test@example.com");
         testUser.setUsername("testuser");
@@ -365,6 +381,174 @@ class AuthIntegrationTest {
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status").value("AUTH_PASSWORD_TOKEN_EXPIRED"));
+        }
+    }
+
+    @Nested
+    @DisplayName("MFA Login Flow Tests")
+    class MfaLoginFlowTests {
+
+        @Test
+        @DisplayName("Admin without MFA should get MFA_SETUP_REQUIRED error")
+        void adminWithoutMfaShouldGetSetupRequiredError() throws Exception {
+            // Create admin user without MFA
+            User adminUser = new User();
+            adminUser.setEmail("admin@example.com");
+            adminUser.setUsername("admin");
+            adminUser.setPassword(passwordEncoder.encode("adminpass123"));
+            adminUser.setEnabled(true);
+            adminUser.setFailedLoginCount(0);
+            adminUser.setRole(adminRole);
+            adminUser.setMfaEnabled(false);
+            userRepository.save(adminUser);
+
+            LoginRequest request = new LoginRequest("admin@example.com", "adminpass123");
+
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.status").value("AUTH_MFA_SETUP_REQUIRED"));
+        }
+
+        @Test
+        @DisplayName("Admin with MFA should get MFA challenge response")
+        void adminWithMfaShouldGetMfaChallenge() throws Exception {
+            // Create admin user with MFA enabled
+            User adminUser = new User();
+            adminUser.setEmail("mfaadmin@example.com");
+            adminUser.setUsername("mfaadmin");
+            adminUser.setPassword(passwordEncoder.encode("adminpass123"));
+            adminUser.setEnabled(true);
+            adminUser.setFailedLoginCount(0);
+            adminUser.setRole(adminRole);
+            adminUser.setMfaEnabled(true);
+            adminUser.setTotpSecret(mfaService.generateSecret());
+            userRepository.save(adminUser);
+
+            LoginRequest request = new LoginRequest("mfaadmin@example.com", "adminpass123");
+
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.mfaToken").isNotEmpty())
+                    .andExpect(jsonPath("$.accessToken").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("Professor without MFA should login directly")
+        void professorWithoutMfaShouldLoginDirectly() throws Exception {
+            LoginRequest request = new LoginRequest("test@example.com", "password123");
+
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                    .andExpect(jsonPath("$.mfaToken").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("Professor with MFA enabled should get MFA challenge")
+        void professorWithMfaShouldGetMfaChallenge() throws Exception {
+            // Enable MFA for the professor
+            testUser.setMfaEnabled(true);
+            testUser.setTotpSecret(mfaService.generateSecret());
+            userRepository.save(testUser);
+
+            LoginRequest request = new LoginRequest("test@example.com", "password123");
+
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.mfaToken").isNotEmpty())
+                    .andExpect(jsonPath("$.accessToken").doesNotExist());
+        }
+    }
+
+    @Nested
+    @DisplayName("MFA Verify Endpoint Tests")
+    class MfaVerifyEndpointTests {
+
+        @Test
+        @DisplayName("Should return 401 for invalid MFA token")
+        void shouldReturn401ForInvalidMfaToken() throws Exception {
+            MfaVerifyRequest request = new MfaVerifyRequest("invalid.token.here", "123456", MfaCodeType.TOTP);
+
+            mockMvc.perform(post("/api/v1/auth/mfa/verify")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value("AUTH_MFA_TOKEN_INVALID"));
+        }
+
+        @Test
+        @DisplayName("Should return 401 for invalid MFA code")
+        void shouldReturn401ForInvalidMfaCode() throws Exception {
+            // Create user with MFA
+            User mfaUser = new User();
+            mfaUser.setEmail("mfaverify@example.com");
+            mfaUser.setUsername("mfaverify");
+            mfaUser.setPassword(passwordEncoder.encode("password123"));
+            mfaUser.setEnabled(true);
+            mfaUser.setFailedLoginCount(0);
+            mfaUser.setRole(userRole);
+            mfaUser.setMfaEnabled(true);
+            mfaUser.setTotpSecret(mfaService.generateSecret());
+            mfaUser = userRepository.save(mfaUser);
+
+            // Generate MFA token
+            String mfaToken = mfaService.generateMfaToken(mfaUser);
+
+            MfaVerifyRequest request = new MfaVerifyRequest(mfaToken, "000000", MfaCodeType.TOTP);
+
+            mockMvc.perform(post("/api/v1/auth/mfa/verify")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value("AUTH_MFA_INVALID_CODE"));
+        }
+    }
+
+    @Nested
+    @DisplayName("MFA Email Code Endpoint Tests")
+    class MfaEmailCodeEndpointTests {
+
+        @Test
+        @DisplayName("Should return 401 for invalid MFA token in email code request")
+        void shouldReturn401ForInvalidMfaToken() throws Exception {
+            mockMvc.perform(post("/api/v1/auth/mfa/email-code")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"mfaToken\": \"invalid.token.here\"}"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value("AUTH_MFA_TOKEN_INVALID"));
+        }
+
+        @Test
+        @DisplayName("Should send email OTP with valid MFA token")
+        void shouldSendEmailOtpWithValidToken() throws Exception {
+            // Create user with MFA
+            User mfaUser = new User();
+            mfaUser.setEmail("emailotp@example.com");
+            mfaUser.setUsername("emailotp");
+            mfaUser.setPassword(passwordEncoder.encode("password123"));
+            mfaUser.setEnabled(true);
+            mfaUser.setFailedLoginCount(0);
+            mfaUser.setRole(userRole);
+            mfaUser.setMfaEnabled(true);
+            mfaUser.setTotpSecret(mfaService.generateSecret());
+            mfaUser = userRepository.save(mfaUser);
+
+            // Generate MFA token
+            String mfaToken = mfaService.generateMfaToken(mfaUser);
+
+            mockMvc.perform(post("/api/v1/auth/mfa/email-code")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"mfaToken\": \"" + mfaToken + "\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.sent").value(true));
         }
     }
 }
