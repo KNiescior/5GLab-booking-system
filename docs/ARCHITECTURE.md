@@ -105,6 +105,91 @@ Technical architecture and design decisions for the 5GLab Booking System.
     │<───────────────────│                      │
 ```
 
+### MFA Login Flow
+
+When MFA is enabled for a user:
+
+```
+┌────────┐      ┌─────────────┐      ┌───────────┐      ┌────────────┐
+│ Client │      │ LoginController│   │ MfaService│      │ MfaController│
+└───┬────┘      └──────┬──────┘      └─────┬─────┘      └─────┬──────┘
+    │                  │                   │                  │
+    │ POST /login      │                   │                  │
+    │ {email,password} │                   │                  │
+    │─────────────────>│                   │                  │
+    │                  │                   │                  │
+    │                  │ Verify password   │                  │
+    │                  │ (success)         │                  │
+    │                  │                   │                  │
+    │                  │ Check MFA enabled?│                  │
+    │                  │──────────────────>│                  │
+    │                  │                   │                  │
+    │                  │    mfaEnabled=true│                  │
+    │                  │<──────────────────│                  │
+    │                  │                   │                  │
+    │                  │ generateMfaToken()│                  │
+    │                  │──────────────────>│                  │
+    │                  │                   │                  │
+    │ 200 OK           │                   │                  │
+    │ {mfaToken}       │                   │                  │
+    │<─────────────────│                   │                  │
+    │                  │                   │                  │
+    │                  │                   │                  │
+    │ POST /mfa/verify │                   │                  │
+    │ {mfaToken, code} │                   │                  │
+    │────────────────────────────────────────────────────────>│
+    │                  │                   │                  │
+    │                  │                   │  parseMfaToken() │
+    │                  │                   │<─────────────────│
+    │                  │                   │                  │
+    │                  │                   │  verifyTotp()    │
+    │                  │                   │<─────────────────│
+    │                  │                   │                  │
+    │ 200 OK           │                   │                  │
+    │ {accessToken}    │                   │                  │
+    │ Set-Cookie:      │                   │                  │
+    │ refreshToken=... │                   │                  │
+    │<────────────────────────────────────────────────────────│
+```
+
+### MFA Setup Flow
+
+```
+┌────────┐      ┌──────────────┐      ┌───────────┐
+│ Client │      │ MfaController │      │ MfaService│
+└───┬────┘      └──────┬───────┘      └─────┬─────┘
+    │                  │                    │
+    │ POST /mfa/setup  │                    │
+    │ (with Bearer)    │                    │
+    │─────────────────>│                    │
+    │                  │                    │
+    │                  │ generateSecret()   │
+    │                  │───────────────────>│
+    │                  │                    │
+    │                  │ generateQrCode()   │
+    │                  │───────────────────>│
+    │                  │                    │
+    │ 200 OK           │                    │
+    │ {secret, qrCode} │                    │
+    │<─────────────────│                    │
+    │                  │                    │
+    │ (User scans QR)  │                    │
+    │                  │                    │
+    │ POST /setup/verify                    │
+    │ {secret, code}   │                    │
+    │─────────────────>│                    │
+    │                  │                    │
+    │                  │ verifyTotp()       │
+    │                  │───────────────────>│
+    │                  │                    │
+    │                  │ generateBackupCodes│
+    │                  │───────────────────>│
+    │                  │                    │
+    │ 200 OK           │                    │
+    │ {backupCodes}    │                    │
+    │<─────────────────│                    │
+```
+
 ### Token Reuse Detection
 
 When a refresh token is used after it has been rotated:
@@ -189,6 +274,17 @@ When a refresh token is used after it has been rotated:
 │ used_at             │
 │ created_at          │
 └─────────────────────┘
+
+┌─────────────────────┐
+│     email_otp       │
+├─────────────────────┤
+│ id (PK)             │
+│ user_id (FK)        │
+│ code_hash           │
+│ expires_at          │
+│ used_at             │
+│ created_at          │
+└─────────────────────┘
 ```
 
 ## Security Architecture
@@ -201,7 +297,7 @@ When a refresh token is used after it has been rotated:
 {
   "sub": "user@example.com",
   "userId": 1,
-  "role": "USER",
+  "role": "PROFESSOR",
   "iat": 1703836800,
   "exp": 1703837700,
   "iss": "booking-system"
@@ -343,7 +439,8 @@ com._glab.booking_system
 │   │   └── SecurityConfig        # Spring Security config
 │   │
 │   ├── controller/
-│   │   └── LoginController       # Auth endpoints
+│   │   ├── LoginController       # Login/refresh/logout endpoints
+│   │   └── MfaController         # MFA setup/verify endpoints
 │   │
 │   ├── exception/
 │   │   ├── AuthenticationFailedException
@@ -353,7 +450,16 @@ com._glab.booking_system
 │   │   ├── RefreshTokenExpiredException
 │   │   ├── RefreshTokenReuseException
 │   │   ├── InvalidPasswordSetupTokenException
-│   │   └── ExpiredPasswordSetupTokenException
+│   │   ├── ExpiredPasswordSetupTokenException
+│   │   ├── MfaRequiredException
+│   │   ├── MfaSetupRequiredException
+│   │   ├── InvalidMfaCodeException
+│   │   ├── InvalidMfaTokenException
+│   │   ├── MfaTokenExpiredException
+│   │   ├── MfaRateLimitedException
+│   │   ├── MfaAlreadyEnabledException
+│   │   ├── MfaNotEnabledException
+│   │   └── MfaVerificationFailedException
 │   │
 │   ├── filter/
 │   │   └── JwtAuthenticationFilter
@@ -361,22 +467,40 @@ com._glab.booking_system
 │   ├── model/
 │   │   ├── RefreshToken          # Refresh token entity
 │   │   ├── PasswordSetupToken    # Password setup entity
-│   │   └── TokenPurpose          # ACCOUNT_SETUP, PASSWORD_RESET
+│   │   ├── EmailOtp              # Email OTP entity
+│   │   ├── TokenPurpose          # ACCOUNT_SETUP, PASSWORD_RESET
+│   │   └── MfaCodeType           # TOTP, EMAIL, BACKUP
 │   │
 │   ├── repository/
 │   │   ├── RefreshTokenRepository
-│   │   └── PasswordSetupTokenRepository
+│   │   ├── PasswordSetupTokenRepository
+│   │   └── EmailOtpRepository
+│   │
+│   ├── request/
+│   │   ├── LoginRequest
+│   │   ├── SetupPasswordRequest
+│   │   ├── MfaVerifyRequest
+│   │   ├── MfaSetupVerifyRequest
+│   │   └── MfaDisableRequest
+│   │
+│   ├── response/
+│   │   ├── LoginResponse
+│   │   ├── MfaChallengeResponse
+│   │   ├── MfaSetupResponse
+│   │   └── MfaSetupCompleteResponse
 │   │
 │   └── service/
 │       ├── JwtService            # Token generation/validation
 │       ├── PasswordSetupTokenService
+│       ├── MfaService            # TOTP, backup codes, MFA tokens
+│       ├── EmailOtpService       # Email OTP generation/verification
 │       └── CustomUserDetailsService
 │
 ├── user/                          # User Module
 │   ├── model/
-│   │   ├── User                  # User entity
+│   │   ├── User                  # User entity (with MFA fields)
 │   │   ├── Role                  # Role entity
-│   │   ├── RoleName              # USER, ADMIN, MODERATOR
+│   │   ├── RoleName              # ADMIN, LAB_MANAGER, PROFESSOR
 │   │   └── Degree                # Academic degree enum
 │   │
 │   └── repository/
@@ -422,6 +546,15 @@ All authentication events are logged with severity levels:
 | Token refresh | DEBUG | Email, IP |
 | Token reuse detected | ERROR | Email, IP (security incident) |
 | Logout | INFO | Email, IP |
+| MFA setup initiated | INFO | Email |
+| MFA enabled | INFO | Email |
+| MFA verification success | INFO | Email, IP |
+| MFA verification failed | WARN | Email, IP, code type |
+| Invalid MFA token | WARN | IP |
+| Email OTP sent | INFO | Email |
+| Email OTP rate limited | DEBUG | Email |
+| MFA disabled | INFO | Email |
+| Backup code used | INFO | Email |
 
 ### Log Format
 
@@ -429,27 +562,67 @@ All authentication events are logged with severity levels:
 2024-01-01T12:00:00.000Z  WARN 12345 --- [http-nio-8080-exec-1] c._g.b.auth.controller.LoginController : Account user@example.com locked for 10 minutes after 3 failed attempts from IP 192.168.1.100
 ```
 
+## MFA Implementation
+
+### Overview
+
+Multi-Factor Authentication is implemented with three verification methods:
+
+| Method | Description | Use Case |
+|--------|-------------|----------|
+| **TOTP** | 6-digit code from authenticator app (Google Authenticator, Authy) | Primary MFA method |
+| **Email OTP** | 6-digit code sent via email | Fallback when TOTP unavailable |
+| **Backup Codes** | 10 one-time codes (e.g., "ABCD-1234") | Emergency access when other methods fail |
+
+### Role-Based MFA Enforcement
+
+| Role | MFA Required | Can Disable |
+|------|--------------|-------------|
+| ADMIN | ✅ Mandatory | ❌ No |
+| LAB_MANAGER | ✅ Mandatory | ❌ No |
+| PROFESSOR | ❌ Optional | ✅ Yes |
+
+### MFA Token
+
+A short-lived JWT (5 minutes) issued after password verification:
+
+```json
+{
+  "sub": "user@example.com",
+  "userId": 1,
+  "mfaPending": true,
+  "jti": "uuid",
+  "exp": "now + 5 min",
+  "iss": "booking-system-mfa"
+}
+```
+
+### Backup Codes
+
+- 10 codes generated on MFA setup
+- Format: `XXXX-XXXX` (alphanumeric, excluding similar chars like 0/O, 1/I)
+- Stored as BCrypt hashes
+- Each code can only be used once
+
+---
+
 ## Future Considerations
 
 ### Planned Enhancements
 
-1. **MFA Support**
-   - TOTP-based two-factor authentication
-   - `mfaEnabled` and `totpSecret` fields already in User entity
-
-2. **Rate Limiting**
+1. **Rate Limiting**
    - Redis-based rate limiting per IP/user
    - Configurable thresholds
 
-3. **GeoIP Analysis**
+2. **GeoIP Analysis**
    - IP geolocation for login anomaly detection
    - Suspicious location alerts
 
-4. **Session Management**
+3. **Session Management**
    - Concurrent session limits
    - Session listing and remote logout
 
-5. **Password Policies**
+4. **Password Policies**
    - Minimum complexity requirements
    - Password history (prevent reuse)
    - Expiration policies

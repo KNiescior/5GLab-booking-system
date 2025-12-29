@@ -28,7 +28,7 @@ Content-Type: application/json
 }
 ```
 
-#### Response (200 OK)
+#### Response (200 OK) - No MFA
 
 ```json
 {
@@ -36,12 +36,24 @@ Content-Type: application/json
   "user": {
     "id": 1,
     "email": "user@example.com",
-    "role": "USER"
+    "role": "PROFESSOR"
   }
 }
 ```
 
 A `refreshToken` cookie is also set (httpOnly, Secure).
+
+#### Response (200 OK) - MFA Required
+
+If the user has MFA enabled, returns an MFA challenge instead:
+
+```json
+{
+  "mfaToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+Use this `mfaToken` with the `/auth/mfa/verify` endpoint to complete login.
 
 #### Error Responses
 
@@ -49,6 +61,7 @@ A `refreshToken` cookie is also set (httpOnly, Secure).
 |--------|------|-------------|
 | 401 | `AUTH_INVALID_CREDENTIALS` | Email or password incorrect |
 | 403 | `AUTH_ACCOUNT_DISABLED` | Account is disabled |
+| 403 | `AUTH_MFA_SETUP_REQUIRED` | Admin/Lab Manager must set up MFA first |
 | 423 | `AUTH_ACCOUNT_LOCKED` | Account is temporarily locked |
 
 #### Example Error Response
@@ -83,7 +96,7 @@ No request body required. The refresh token is read from the httpOnly cookie.
   "user": {
     "id": 1,
     "email": "user@example.com",
-    "role": "USER"
+    "role": "PROFESSOR"
   }
 }
 ```
@@ -142,7 +155,7 @@ Content-Type: application/json
   "user": {
     "id": 1,
     "email": "user@example.com",
-    "role": "USER"
+    "role": "PROFESSOR"
   }
 }
 ```
@@ -155,6 +168,246 @@ The user is automatically logged in after setting the password.
 |--------|------|-------------|
 | 400 | `AUTH_PASSWORD_TOKEN_INVALID` | Token not found or already used |
 | 400 | `AUTH_PASSWORD_TOKEN_EXPIRED` | Token has expired |
+
+---
+
+## MFA Endpoints
+
+Multi-Factor Authentication endpoints for setting up and verifying 2FA.
+
+> **Note**: MFA is **mandatory** for Admin and Lab Manager roles. Professors can optionally enable MFA.
+
+### POST /auth/mfa/setup
+
+Start MFA setup by generating a TOTP secret and QR code.
+
+**Requires Authentication**: Yes (Bearer token)
+
+#### Request
+
+```http
+POST /api/v1/auth/mfa/setup
+Authorization: Bearer <access_token>
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "qrCodeDataUri": "data:image/png;base64,iVBORw0KGgo...",
+  "otpAuthUri": "otpauth://totp/5GLab%20Booking:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=5GLab%20Booking"
+}
+```
+
+Display the QR code to the user for scanning with an authenticator app.
+
+#### Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 409 | `AUTH_MFA_ALREADY_ENABLED` | MFA is already enabled |
+
+---
+
+### POST /auth/mfa/setup/verify
+
+Complete MFA setup by verifying the first TOTP code.
+
+**Requires Authentication**: Yes (Bearer token)
+
+#### Request
+
+```http
+POST /api/v1/auth/mfa/setup/verify
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "code": "123456"
+}
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "enabled": true,
+  "backupCodes": [
+    "ABCD-1234",
+    "EFGH-5678",
+    "IJKL-9012",
+    "..."
+  ],
+  "message": "MFA has been enabled. Please save your backup codes in a safe place."
+}
+```
+
+> ⚠️ **Important**: Backup codes are shown **only once**. Users must save them securely.
+
+#### Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_MFA_INVALID_CODE` | TOTP code is incorrect |
+| 409 | `AUTH_MFA_ALREADY_ENABLED` | MFA is already enabled |
+
+---
+
+### POST /auth/mfa/verify
+
+Verify MFA code during login (after password verification).
+
+**Requires Authentication**: No (uses `mfaToken` from login response)
+
+#### Request
+
+```http
+POST /api/v1/auth/mfa/verify
+Content-Type: application/json
+
+{
+  "mfaToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "code": "123456",
+  "codeType": "TOTP"
+}
+```
+
+**Code Types**:
+- `TOTP` - 6-digit code from authenticator app (default)
+- `EMAIL` - 6-digit code sent via email
+- `BACKUP` - One-time backup code (e.g., "ABCD-1234")
+
+#### Response (200 OK)
+
+```json
+{
+  "accessToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "role": "ADMIN"
+  }
+}
+```
+
+A `refreshToken` cookie is also set.
+
+#### Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_MFA_TOKEN_INVALID` | MFA token is invalid |
+| 401 | `AUTH_MFA_TOKEN_EXPIRED` | MFA token has expired (5 min limit) |
+| 401 | `AUTH_MFA_INVALID_CODE` | Verification code is incorrect |
+
+---
+
+### POST /auth/mfa/email-code
+
+Request an email OTP as an alternative to TOTP.
+
+**Requires Authentication**: No (uses `mfaToken` from login response)
+
+#### Request
+
+```http
+POST /api/v1/auth/mfa/email-code
+Content-Type: application/json
+
+{
+  "mfaToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "sent": true,
+  "message": "Verification code sent to your email"
+}
+```
+
+If rate-limited:
+
+```json
+{
+  "sent": false,
+  "message": "Please wait before requesting another code"
+}
+```
+
+#### Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_MFA_TOKEN_INVALID` | MFA token is invalid or expired |
+
+---
+
+### POST /auth/mfa/disable
+
+Disable MFA for the current user.
+
+**Requires Authentication**: Yes (Bearer token)
+
+> **Note**: Admins and Lab Managers **cannot** disable MFA.
+
+#### Request
+
+```http
+POST /api/v1/auth/mfa/disable
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "code": "123456"
+}
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "mfaEnabled": false,
+  "message": "MFA has been disabled"
+}
+```
+
+#### Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 400 | `AUTH_MFA_NOT_ENABLED` | MFA is not enabled |
+| 401 | `AUTH_MFA_INVALID_CODE` | TOTP code is incorrect |
+| 403 | `AUTH_MFA_REQUIRED` | Cannot disable (role requires MFA) |
+
+---
+
+### GET /auth/mfa/status
+
+Get MFA status for the current user.
+
+**Requires Authentication**: Yes (Bearer token)
+
+#### Request
+
+```http
+GET /api/v1/auth/mfa/status
+Authorization: Bearer <access_token>
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "mfaEnabled": true,
+  "mfaRequired": true,
+  "canDisable": false
+}
+```
 
 ---
 
@@ -217,6 +470,19 @@ All API errors follow this format:
 |------|-------------|-------------|
 | `AUTH_PASSWORD_TOKEN_INVALID` | 400 | Password setup token invalid or used |
 | `AUTH_PASSWORD_TOKEN_EXPIRED` | 400 | Password setup token has expired |
+
+#### MFA Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `AUTH_MFA_REQUIRED` | 403 | MFA cannot be disabled for this role |
+| `AUTH_MFA_SETUP_REQUIRED` | 403 | Must set up MFA before proceeding |
+| `AUTH_MFA_INVALID_CODE` | 401 | TOTP/email/backup code is invalid |
+| `AUTH_MFA_TOKEN_INVALID` | 401 | MFA token is invalid |
+| `AUTH_MFA_TOKEN_EXPIRED` | 401 | MFA token has expired (5 min) |
+| `AUTH_MFA_RATE_LIMITED` | 429 | Too many OTP requests |
+| `AUTH_MFA_ALREADY_ENABLED` | 409 | MFA is already enabled |
+| `AUTH_MFA_NOT_ENABLED` | 400 | MFA is not enabled |
 
 #### Validation Errors
 
