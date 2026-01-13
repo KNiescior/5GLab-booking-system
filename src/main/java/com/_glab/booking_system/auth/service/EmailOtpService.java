@@ -5,9 +5,6 @@ import com._glab.booking_system.auth.repository.EmailOtpRepository;
 import com._glab.booking_system.user.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +30,7 @@ public class EmailOtpService {
     private static final int OTP_LENGTH = 6;
 
     private final EmailOtpRepository emailOtpRepository;
-    private final JavaMailSender mailSender;
+    private final EmailService emailService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     /**
@@ -61,8 +58,8 @@ public class EmailOtpService {
         emailOtp.setExpiresAt(OffsetDateTime.now().plus(OTP_EXPIRY));
         emailOtpRepository.save(emailOtp);
 
-        // Send email asynchronously
-        sendOtpEmail(user.getEmail(), otp);
+        // Send email via EmailService
+        emailService.sendOtpEmail(user.getEmail(), otp, OTP_EXPIRY.toMinutes());
 
         log.info("OTP sent to user {}", user.getEmail());
         return true;
@@ -159,30 +156,6 @@ public class EmailOtpService {
             return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("SHA-256 not available", e);
-        }
-    }
-
-    /**
-     * Send OTP via email.
-     */
-    @Async
-    protected void sendOtpEmail(String email, String otp) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setTo(email);
-            message.setSubject("5GLab Booking - Your Verification Code");
-            message.setText(String.format(
-                    "Your verification code is: %s\n\n" +
-                    "This code will expire in %d minutes.\n\n" +
-                    "If you did not request this code, please ignore this email.",
-                    otp,
-                    OTP_EXPIRY.toMinutes()
-            ));
-
-            mailSender.send(message);
-            log.debug("OTP email sent to {}", email);
-        } catch (Exception e) {
-            log.error("Failed to send OTP email to {}", email, e);
         }
     }
 }
