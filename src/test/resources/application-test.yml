@@ -27,6 +27,12 @@ jwt:
   refresh-token-expiry: 7d
   issuer: booking-system-test
 
+app:
+  mail:
+    from: test@example.com
+  frontend:
+    url: http://localhost:3000
+
 
 
 
