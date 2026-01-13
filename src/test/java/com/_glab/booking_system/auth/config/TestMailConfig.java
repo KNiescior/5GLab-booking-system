@@ -1,10 +1,10 @@
 package com._glab.booking_system.auth.config;
 
+import org.mockito.Mockito;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
 
 /**
  * Test configuration that provides a mock JavaMailSender.
@@ -16,9 +16,8 @@ public class TestMailConfig {
     @Bean
     @Primary
     public JavaMailSender javaMailSender() {
-        // Return a simple implementation that won't actually send emails
-        // In tests, the @Async email sending will just complete without sending
-        return new JavaMailSenderImpl();
+        // Return a mock that does nothing when send() is called
+        return Mockito.mock(JavaMailSender.class);
     }
 }
 

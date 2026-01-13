@@ -2,6 +2,9 @@ package com._glab.booking_system;
 
 public enum ErrorResponseCode {
     USER_EMAIL_NOT_VALID,
+    USER_EMAIL_ALREADY_EXISTS,
+    USER_USERNAME_ALREADY_EXISTS,
+    USER_INVALID_ROLE,
 
     // Authentication / JWT
     AUTH_INVALID_TOKEN,
