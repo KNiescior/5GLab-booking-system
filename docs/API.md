@@ -411,6 +411,155 @@ Authorization: Bearer <access_token>
 
 ---
 
+## User Management Endpoints
+
+User management endpoints for admin operations.
+
+### POST /users
+
+Register a new user (Admin only).
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+#### Request
+
+```http
+POST /api/v1/users
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
+{
+  "email": "newuser@example.com",
+  "username": "johsmi",
+  "firstName": "John",
+  "lastName": "Smith",
+  "degree": "DR",
+  "roleName": "PROFESSOR"
+}
+```
+
+**Fields**:
+- `email` (required) - Valid email address
+- `username` (required) - 3-30 chars, alphanumeric and underscores only
+- `firstName` (required) - User's first name
+- `lastName` (required) - User's last name
+- `degree` (optional) - One of: `INZ`, `MGR`, `MGR_INZ`, `DR`, `DR_INZ`, `DR_HAB`, `PROF`
+- `roleName` (required) - One of: `ADMIN`, `LAB_MANAGER`, `PROFESSOR`
+
+> **Note**: Frontend should suggest username as `firstName.substring(0,3) + lastName.substring(0,3)` lowercase. Admin can edit before submitting.
+
+#### Response (201 Created)
+
+```json
+{
+  "id": 1,
+  "email": "newuser@example.com",
+  "username": "johsmi",
+  "firstName": "John",
+  "lastName": "Smith",
+  "degree": "DR",
+  "role": "PROFESSOR",
+  "enabled": false,
+  "createdAt": "2026-01-13T12:00:00Z"
+}
+```
+
+The user is created with `enabled=false`. An email is sent to the user with a password setup link.
+
+#### Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 403 | - | Not authorized (not ADMIN role) |
+| 409 | `USER_EMAIL_ALREADY_EXISTS` | Email already registered |
+| 409 | `USER_USERNAME_ALREADY_EXISTS` | Username already taken |
+| 400 | `USER_INVALID_ROLE` | Invalid role specified |
+
+---
+
+### GET /users/{id}
+
+Get a user by ID.
+
+**Requires Authentication**: Yes (Bearer token)
+
+#### Request
+
+```http
+GET /api/v1/users/1
+Authorization: Bearer <access_token>
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "username": "johsmi",
+  "firstName": "John",
+  "lastName": "Smith",
+  "degree": "DR",
+  "role": "PROFESSOR",
+  "enabled": true,
+  "createdAt": "2026-01-13T12:00:00Z"
+}
+```
+
+#### Error Responses
+
+| Status | Description |
+|--------|-------------|
+| 404 | User not found |
+
+---
+
+### GET /users/check-username
+
+Check if a username is available (Admin only).
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+#### Request
+
+```http
+GET /api/v1/users/check-username?username=johsmi
+Authorization: Bearer <admin_access_token>
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "available": true
+}
+```
+
+---
+
+### GET /users/check-email
+
+Check if an email is available (Admin only).
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+#### Request
+
+```http
+GET /api/v1/users/check-email?email=user@example.com
+Authorization: Bearer <admin_access_token>
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "available": false
+}
+```
+
+---
+
 ## Using Access Tokens
 
 ### Authorization Header
@@ -483,6 +632,14 @@ All API errors follow this format:
 | `AUTH_MFA_RATE_LIMITED` | 429 | Too many OTP requests |
 | `AUTH_MFA_ALREADY_ENABLED` | 409 | MFA is already enabled |
 | `AUTH_MFA_NOT_ENABLED` | 400 | MFA is not enabled |
+
+#### User Management Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `USER_EMAIL_ALREADY_EXISTS` | 409 | Email already registered |
+| `USER_USERNAME_ALREADY_EXISTS` | 409 | Username already taken |
+| `USER_INVALID_ROLE` | 400 | Invalid role specified |
 
 #### Validation Errors
 

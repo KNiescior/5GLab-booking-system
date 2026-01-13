@@ -190,6 +190,44 @@ When MFA is enabled for a user:
     │<─────────────────│                    │
 ```
 
+### User Registration Flow (Admin Only)
+
+```
+┌────────┐      ┌────────────────┐      ┌───────────┐      ┌────────────┐
+│ Admin  │      │ UserController │      │UserService│      │EmailService│
+└───┬────┘      └───────┬────────┘      └─────┬─────┘      └─────┬──────┘
+    │                   │                     │                  │
+    │ POST /users       │                     │                  │
+    │ {email,username,  │                     │                  │
+    │  firstName,...}   │                     │                  │
+    │──────────────────>│                     │                  │
+    │                   │                     │                  │
+    │                   │ @PreAuthorize(ADMIN)│                  │
+    │                   │                     │                  │
+    │                   │ registerUser()      │                  │
+    │                   │────────────────────>│                  │
+    │                   │                     │                  │
+    │                   │    Validate email   │                  │
+    │                   │    Validate username│                  │
+    │                   │    Create User      │                  │
+    │                   │    (enabled=false)  │                  │
+    │                   │                     │                  │
+    │                   │    Generate token   │                  │
+    │                   │    (48h expiry)     │                  │
+    │                   │                     │                  │
+    │                   │                     │ sendSetupEmail() │
+    │                   │                     │─────────────────>│
+    │                   │                     │                  │
+    │                   │                     │          Email   │
+    │                   │                     │          with    │
+    │                   │                     │          link    │
+    │                   │                     │      ──────────> │ User
+    │                   │                     │                  │
+    │ 201 Created       │                     │                  │
+    │ {id, email, ...}  │                     │                  │
+    │<──────────────────│                     │                  │
+```
+
 ### Token Reuse Detection
 
 When a refresh token is used after it has been rotated:
@@ -436,6 +474,7 @@ com._glab.booking_system
 │   ├── config/
 │   │   ├── JwtKeyProvider        # RSA key management
 │   │   ├── JwtProperties         # JWT configuration
+│   │   ├── AppProperties         # App-wide config (mail, frontend URL)
 │   │   └── SecurityConfig        # Spring Security config
 │   │
 │   ├── controller/
@@ -494,18 +533,36 @@ com._glab.booking_system
 │       ├── PasswordSetupTokenService
 │       ├── MfaService            # TOTP, backup codes, MFA tokens
 │       ├── EmailOtpService       # Email OTP generation/verification
+│       ├── EmailService          # Centralized email sending
 │       └── CustomUserDetailsService
 │
 ├── user/                          # User Module
+│   ├── controller/
+│   │   └── UserController        # Admin-only user registration
+│   │
+│   ├── exception/
+│   │   ├── UserAlreadyExistsException
+│   │   ├── UsernameAlreadyExistsException
+│   │   └── InvalidRoleException
+│   │
 │   ├── model/
 │   │   ├── User                  # User entity (with MFA fields)
 │   │   ├── Role                  # Role entity
 │   │   ├── RoleName              # ADMIN, LAB_MANAGER, PROFESSOR
 │   │   └── Degree                # Academic degree enum
 │   │
-│   └── repository/
-│       ├── UserRepository
-│       └── RoleRepository
+│   ├── repository/
+│   │   ├── UserRepository
+│   │   └── RoleRepository
+│   │
+│   ├── request/
+│   │   └── CreateUserRequest     # Admin registration request
+│   │
+│   ├── response/
+│   │   └── UserResponse          # User info response
+│   │
+│   └── service/
+│       └── UserService           # User registration logic
 │
 ├── ErrorResponse                  # Global error format
 ├── ErrorResponseCode              # Error code enum
