@@ -14,5 +14,6 @@ import lombok.NoArgsConstructor;
 public class LabWorkstationsResponse {
 
     private Integer labId;
+    private String labName;
     private List<WorkstationResponse> workstations;
 }
