@@ -55,12 +55,16 @@ public class MfaController {
 
     /**
      * Start MFA setup - generates a new TOTP secret and QR code.
-     * Requires authentication.
+     * Accepts either:
+     * - Regular authentication (for voluntary MFA setup)
+     * - MFA token (for mandatory MFA setup before first login)
      */
     @PostMapping("/setup")
-    public ResponseEntity<MfaSetupResponse> setupMfa(@AuthenticationPrincipal UserDetails userDetails) {
-        User user = userRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new AuthenticationFailedException("User not found"));
+    public ResponseEntity<MfaSetupResponse> setupMfa(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody(required = false) Map<String, String> request) {
+        
+        User user = resolveUserForSetup(userDetails, request);
 
         if (Boolean.TRUE.equals(user.getMfaEnabled())) {
             log.warn("MFA setup attempt for user {} who already has MFA enabled", user.getEmail());
@@ -78,15 +82,17 @@ public class MfaController {
 
     /**
      * Complete MFA setup by verifying the first TOTP code.
-     * Requires authentication.
+     * Accepts either:
+     * - Regular authentication (for voluntary MFA setup)
+     * - MFA token in request body (for mandatory MFA setup before first login)
      */
     @PostMapping("/setup/verify")
     public ResponseEntity<MfaSetupCompleteResponse> verifySetup(
             @AuthenticationPrincipal UserDetails userDetails,
-            @RequestBody MfaSetupVerifyRequest request) {
+            @RequestBody MfaSetupVerifyRequest request,
+            HttpServletResponse httpResponse) {
 
-        User user = userRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new AuthenticationFailedException("User not found"));
+        User user = resolveUserForSetup(userDetails, request.getMfaToken());
 
         if (Boolean.TRUE.equals(user.getMfaEnabled())) {
             log.warn("MFA setup verify attempt for user {} who already has MFA enabled", user.getEmail());
@@ -111,9 +117,37 @@ public class MfaController {
 
         log.info("MFA enabled for user {}", user.getEmail());
 
+        // If this was via MFA token (not regular auth), also complete login
+        String accessToken = null;
+        if (userDetails == null && request.getMfaToken() != null) {
+            accessToken = jwtService.generateAccessToken(user);
+            JwtService.RefreshTokenResult refreshResult = jwtService.generateRefreshToken(user);
+            
+            RefreshToken refreshToken = new RefreshToken();
+            refreshToken.setUser(user);
+            refreshToken.setTokenId(refreshResult.jti());
+            refreshToken.setExpiresAt(OffsetDateTime.ofInstant(refreshResult.expiresAt().toInstant(), ZoneOffset.UTC));
+            refreshTokenRepository.save(refreshToken);
+            
+            ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshResult.token())
+                    .httpOnly(true)
+                    .secure(false)
+                    .path("/api/v1/auth/refresh")
+                    .maxAge(jwtProperties.getRefreshTokenExpiry().toSeconds())
+                    .sameSite("Strict")
+                    .build();
+            httpResponse.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+            
+            log.info("MFA setup completed and user {} logged in", user.getEmail());
+        }
+
         return ResponseEntity.ok(new MfaSetupCompleteResponse(
                 true,
                 backupCodes.plainCodes(),
+                accessToken,
+                user.getId(),
+                user.getEmail(),
+                user.getRole() != null ? user.getRole().getName().name() : "PROFESSOR",
                 "MFA has been enabled. Please save your backup codes in a safe place."
         ));
     }
@@ -289,6 +323,39 @@ public class MfaController {
     }
 
     // ==================== Helper Methods ====================
+
+    /**
+     * Resolves the user for MFA setup from either:
+     * 1. Regular authentication (userDetails)
+     * 2. MFA token in request body (for mandatory setup)
+     */
+    private User resolveUserForSetup(UserDetails userDetails, Map<String, String> request) {
+        String mfaToken = request != null ? request.get("mfaToken") : null;
+        return resolveUserForSetup(userDetails, mfaToken);
+    }
+
+    private User resolveUserForSetup(UserDetails userDetails, String mfaToken) {
+        // Try regular authentication first
+        if (userDetails != null) {
+            return userRepository.findByEmail(userDetails.getUsername())
+                    .orElseThrow(() -> new AuthenticationFailedException("User not found"));
+        }
+        
+        // Fall back to MFA token
+        if (mfaToken != null && !mfaToken.isBlank()) {
+            MfaService.MfaTokenClaims claims;
+            try {
+                claims = mfaService.parseMfaToken(mfaToken);
+            } catch (Exception e) {
+                log.warn("Invalid MFA token in setup request");
+                throw new InvalidMfaTokenException("Invalid or expired MFA token");
+            }
+            return userRepository.findById(claims.userId())
+                    .orElseThrow(() -> new AuthenticationFailedException("User not found"));
+        }
+        
+        throw new AuthenticationFailedException("Authentication required - provide either valid JWT or mfaToken");
+    }
 
     private boolean verifyAndConsumeBackupCode(User user, String code) {
         List<String> hashedCodes = deserializeBackupCodes(user.getBackupCodes());

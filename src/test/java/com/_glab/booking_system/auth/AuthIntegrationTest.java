@@ -404,11 +404,14 @@ class AuthIntegrationTest {
 
             LoginRequest request = new LoginRequest("admin@example.com", "adminpass123");
 
+            // Admin without MFA should get MFA setup required response with mfaToken
             mockMvc.perform(post("/api/v1/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.status").value("AUTH_MFA_SETUP_REQUIRED"));
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.mfaToken").isNotEmpty())
+                    .andExpect(jsonPath("$.mfaSetupRequired").value(true))
+                    .andExpect(jsonPath("$.accessToken").doesNotExist());
         }
 
         @Test

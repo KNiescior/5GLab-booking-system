@@ -64,12 +64,17 @@ public class SecurityConfig {
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout",
                                 "/api/v1/auth/setup-password",
+                                // MFA endpoints (can use mfaToken instead of JWT)
+                                "/api/v1/auth/mfa/setup",
+                                "/api/v1/auth/mfa/setup/verify",
                                 "/api/v1/auth/mfa/verify",
                                 "/api/v1/auth/mfa/email-code",
                                 // Building & Lab discovery (public)
                                 "/api/v1/buildings",
                                 "/api/v1/buildings/**",
                                 "/api/v1/labs/**",
+                                // Bootstrap (first-run only)
+                                "/api/v1/bootstrap/**",
                                 // Swagger
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",

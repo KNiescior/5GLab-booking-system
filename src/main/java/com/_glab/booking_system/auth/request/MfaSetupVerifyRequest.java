@@ -22,5 +22,11 @@ public class MfaSetupVerifyRequest {
      * The 6-digit TOTP code from the authenticator app.
      */
     private String code;
+    
+    /**
+     * Optional MFA token for users who must set up MFA before their first login.
+     * If not provided, regular JWT authentication is expected.
+     */
+    private String mfaToken;
 }
 
