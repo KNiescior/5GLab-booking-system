@@ -15,7 +15,10 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com._glab.booking_system.auth.service.EmailService;
+import com._glab.booking_system.booking.exception.*;
 import com._glab.booking_system.booking.model.Lab;
+import com._glab.booking_system.booking.model.LabManager;
 import com._glab.booking_system.booking.model.LabOperatingHours;
 import com._glab.booking_system.booking.model.RecurrenceType;
 import com._glab.booking_system.booking.model.RecurringPattern;
@@ -23,8 +26,6 @@ import com._glab.booking_system.booking.model.Reservation;
 import com._glab.booking_system.booking.model.ReservationStatus;
 import com._glab.booking_system.booking.model.ReservationWorkstation;
 import com._glab.booking_system.booking.model.Workstation;
-import com._glab.booking_system.auth.service.EmailService;
-import com._glab.booking_system.booking.model.LabManager;
 import com._glab.booking_system.booking.repository.LabClosedDayRepository;
 import com._glab.booking_system.booking.repository.LabManagerRepository;
 import com._glab.booking_system.booking.repository.LabOperatingHoursRepository;
@@ -113,7 +114,7 @@ public class ReservationService {
 
         CreateReservationRequest.RecurringConfig recurringConfig = request.getRecurring();
         if (recurringConfig == null) {
-            throw new IllegalArgumentException("Recurring configuration is required");
+            throw new InvalidRecurringPatternException("Recurring configuration is required");
         }
 
         // Parse pattern type
@@ -121,7 +122,7 @@ public class ReservationService {
         try {
             patternType = RecurrenceType.valueOf(recurringConfig.getPatternType().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid pattern type: " + recurringConfig.getPatternType());
+            throw new InvalidRecurringPatternException("Invalid pattern type: " + recurringConfig.getPatternType());
         }
 
         // Generate a group ID for all occurrences
@@ -137,7 +138,7 @@ public class ReservationService {
         );
 
         if (occurrenceDates.isEmpty()) {
-            throw new IllegalArgumentException("No valid occurrence dates could be generated");
+            throw new NoValidOccurrencesException("No valid occurrence dates could be generated");
         }
 
         log.info("Generating {} occurrences for recurring reservation", occurrenceDates.size());
@@ -172,7 +173,7 @@ public class ReservationService {
         }
 
         if (reservationResponses.isEmpty()) {
-            throw new IllegalArgumentException("No valid reservations could be created. All dates may be invalid.");
+            throw new NoValidOccurrencesException();
         }
 
         // Save the recurring pattern
@@ -213,7 +214,7 @@ public class ReservationService {
 
         // Validate lab exists
         Lab lab = labRepository.findById(request.getLabId())
-                .orElseThrow(() -> new IllegalArgumentException("Lab not found: " + request.getLabId()));
+                .orElseThrow(() -> new LabNotFoundException(request.getLabId()));
 
         // Validate times
         validateTimes(request);
@@ -311,15 +312,15 @@ public class ReservationService {
         OffsetDateTime now = OffsetDateTime.now();
 
         if (request.getStartTime().isAfter(request.getEndTime())) {
-            throw new IllegalArgumentException("Start time must be before end time");
+            throw new InvalidReservationTimeException("Start time must be before end time");
         }
 
         if (request.getStartTime().isBefore(now)) {
-            throw new IllegalArgumentException("Start time must be in the future");
+            throw new InvalidReservationTimeException("Start time must be in the future");
         }
 
         if (Duration.between(request.getStartTime(), request.getEndTime()).toMinutes() < 15) {
-            throw new IllegalArgumentException("Reservation duration must be at least 15 minutes");
+            throw new InvalidReservationTimeException("Reservation duration must be at least 15 minutes");
         }
     }
 
@@ -335,7 +336,7 @@ public class ReservationService {
             LabOperatingHours operatingHours = operatingHoursOpt.get();
 
             if (operatingHours.getIsClosed()) {
-                throw new IllegalArgumentException("Lab is closed on this day");
+                throw new LabClosedException("Lab is closed on this day");
             }
 
             LocalTime startLocalTime = startTime.toLocalTime();
@@ -343,7 +344,7 @@ public class ReservationService {
 
             if (startLocalTime.isBefore(operatingHours.getOpenTime()) || 
                 endLocalTime.isAfter(operatingHours.getCloseTime())) {
-                throw new IllegalArgumentException("Reservation time must be within operating hours (" 
+                throw new OutsideOperatingHoursException("Reservation time must be within operating hours (" 
                         + operatingHours.getOpenTime() + " - " + operatingHours.getCloseTime() + ")");
             }
         } else {
@@ -354,14 +355,14 @@ public class ReservationService {
 
                 if (startLocalTime.isBefore(lab.getDefaultOpenTime()) || 
                     endLocalTime.isAfter(lab.getDefaultCloseTime())) {
-                    throw new IllegalArgumentException("Reservation time must be within operating hours (" 
+                    throw new OutsideOperatingHoursException("Reservation time must be within operating hours (" 
                             + lab.getDefaultOpenTime() + " - " + lab.getDefaultCloseTime() + ")");
                 }
             }
             
             // Check if it's Sunday (default closed)
             if (dayOfWeek == 0) {
-                throw new IllegalArgumentException("Lab is closed on Sundays by default");
+                throw new LabClosedException("Lab is closed on Sundays by default");
             }
         }
     }
@@ -371,26 +372,26 @@ public class ReservationService {
         int dayOfWeek = (javaDayValue == 7) ? 0 : javaDayValue;
 
         if (labClosedDayRepository.isLabClosedOnDate(labId, date, dayOfWeek)) {
-            throw new IllegalArgumentException("Lab is closed on " + date);
+            throw new LabClosedException("Lab is closed on " + date);
         }
     }
 
     private List<Workstation> validateAndGetWorkstations(Integer labId, List<Integer> workstationIds) {
         if (workstationIds == null || workstationIds.isEmpty()) {
-            throw new IllegalArgumentException("At least one workstation must be selected, or choose 'whole lab'");
+            throw new NoWorkstationsSelectedException();
         }
 
         List<Workstation> workstations = new ArrayList<>();
         for (Integer wsId : workstationIds) {
             Workstation ws = workstationRepository.findById(wsId)
-                    .orElseThrow(() -> new IllegalArgumentException("Workstation not found: " + wsId));
+                    .orElseThrow(() -> new WorkstationNotFoundException(wsId));
             
             if (!ws.getLab().getId().equals(labId)) {
-                throw new IllegalArgumentException("Workstation " + wsId + " does not belong to this lab");
+                throw new WorkstationNotInLabException(wsId, labId);
             }
             
             if (!ws.getActive()) {
-                throw new IllegalArgumentException("Workstation " + ws.getIdentifier() + " is not active");
+                throw new WorkstationInactiveException(ws.getIdentifier());
             }
             
             workstations.add(ws);

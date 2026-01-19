@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com._glab.booking_system.booking.exception.LabNotFoundException;
 import com._glab.booking_system.booking.model.Lab;
 import com._glab.booking_system.booking.response.CurrentAvailabilityResponse;
 import com._glab.booking_system.booking.response.LabAvailabilityResponse;
@@ -36,7 +37,7 @@ public class LabController {
     public ResponseEntity<Lab> getLabById(@PathVariable Integer labId) {
         return labService.getLabById(labId)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new LabNotFoundException(labId));
     }
 
     /**
