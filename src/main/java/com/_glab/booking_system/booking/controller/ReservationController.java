@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com._glab.booking_system.auth.exception.AuthenticationFailedException;
+import com._glab.booking_system.booking.exception.ReservationNotFoundException;
 import com._glab.booking_system.booking.request.CreateReservationRequest;
 import com._glab.booking_system.booking.response.RecurringReservationResponse;
 import com._glab.booking_system.booking.response.ReservationResponse;
@@ -46,7 +48,7 @@ public class ReservationController {
         // Note: getUsername() returns the email address in this app
         // (see CustomUserDetailsService which loads users by email)
         User user = userRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new AuthenticationFailedException("Authenticated user not found"));
         
         // If recurring, return full recurring response
         if (request.getRecurring() != null) {
@@ -66,7 +68,7 @@ public class ReservationController {
     public ResponseEntity<ReservationResponse> getReservation(@PathVariable UUID id) {
         return reservationService.getReservationById(id)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ReservationNotFoundException(id));
     }
 
     /**
@@ -77,7 +79,7 @@ public class ReservationController {
             @AuthenticationPrincipal UserDetails userDetails) {
         
         User user = userRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new AuthenticationFailedException("Authenticated user not found"));
         
         List<ReservationResponse> reservations = reservationService.getUserReservations(user.getId());
         return ResponseEntity.ok(reservations);
