@@ -55,8 +55,13 @@ public class AvailabilityService {
      * @return Availability data including operating hours, closed days, and reservations
      */
     public LabAvailabilityResponse getWeeklyAvailability(Integer labId, LocalDate weekStart) {
+        log.debug("Getting weekly availability for lab {} starting week {}", labId, weekStart);
+        
         Lab lab = labRepository.findById(labId)
-                .orElseThrow(() -> new IllegalArgumentException("Lab not found: " + labId));
+                .orElseThrow(() -> {
+                    log.warn("Lab not found when fetching weekly availability: {}", labId);
+                    return new IllegalArgumentException("Lab not found: " + labId);
+                });
 
         // Normalize to Monday of the week
         if (weekStart == null) {
@@ -65,18 +70,23 @@ public class AvailabilityService {
             weekStart = weekStart.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         }
         LocalDate weekEnd = weekStart.plusDays(6); // Sunday
+        
+        log.debug("Normalized week range: {} to {}", weekStart, weekEnd);
 
         // Get operating hours
         List<OperatingHoursResponse> operatingHours = getOperatingHours(labId, lab);
+        log.debug("Retrieved {} operating hours entries for lab {}", operatingHours.size(), labId);
 
         // Get closed days for this week
         List<ClosedDayResponse> closedDays = getClosedDaysInRange(labId, weekStart, weekEnd);
+        log.debug("Found {} closed days in range for lab {}", closedDays.size(), labId);
 
         // Get reservations for this week
         OffsetDateTime startDateTime = weekStart.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime endDateTime = weekEnd.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
         
         List<ReservationSummaryResponse> reservations = getReservationsInRange(labId, startDateTime, endDateTime);
+        log.debug("Found {} reservations in range for lab {}", reservations.size(), labId);
 
         return LabAvailabilityResponse.builder()
                 .labId(labId)
@@ -93,17 +103,24 @@ public class AvailabilityService {
      * Get current availability - what's happening right now.
      */
     public CurrentAvailabilityResponse getCurrentAvailability(Integer labId) {
+        log.debug("Getting current availability for lab {}", labId);
+        
         Lab lab = labRepository.findById(labId)
-                .orElseThrow(() -> new IllegalArgumentException("Lab not found: " + labId));
+                .orElseThrow(() -> {
+                    log.warn("Lab not found when fetching current availability: {}", labId);
+                    return new IllegalArgumentException("Lab not found: " + labId);
+                });
 
         OffsetDateTime now = OffsetDateTime.now();
         
         // Check if lab is currently open
         boolean isOpen = isLabOpenAt(labId, lab, now);
+        log.debug("Lab {} is currently {}", labId, isOpen ? "open" : "closed");
 
         // Get current APPROVED reservations only
         List<Reservation> currentReservations = reservationRepository.findCurrentReservations(
                 labId, now, ReservationStatus.APPROVED);
+        log.debug("Found {} current approved reservations for lab {}", currentReservations.size(), labId);
 
         List<ReservationSummaryResponse> reservationSummaries = currentReservations.stream()
                 .map(this::toReservationSummary)
@@ -121,10 +138,16 @@ public class AvailabilityService {
      * Get all workstations for a lab.
      */
     public LabWorkstationsResponse getLabWorkstations(Integer labId) {
+        log.debug("Getting workstations for lab {}", labId);
+        
         Lab lab = labRepository.findById(labId)
-                .orElseThrow(() -> new IllegalArgumentException("Lab not found: " + labId));
+                .orElseThrow(() -> {
+                    log.warn("Lab not found when fetching workstations: {}", labId);
+                    return new IllegalArgumentException("Lab not found: " + labId);
+                });
 
         List<Workstation> workstations = workstationRepository.findByLabId(labId);
+        log.debug("Found {} workstations for lab {} ({})", workstations.size(), labId, lab.getName());
 
         List<WorkstationResponse> workstationResponses = workstations.stream()
                 .map(ws -> WorkstationResponse.builder()

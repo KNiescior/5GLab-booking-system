@@ -61,33 +61,49 @@ public class ReservationService {
      * Get all reservations for a lab.
      */
     public List<Reservation> getReservationsByLabId(Integer labId) {
-        return reservationRepository.findByLabId(labId);
+        log.debug("Fetching all reservations for lab {}", labId);
+        List<Reservation> reservations = reservationRepository.findByLabId(labId);
+        log.debug("Found {} reservations for lab {}", reservations.size(), labId);
+        return reservations;
     }
 
     /**
      * Get a reservation by ID.
      */
     public Optional<ReservationResponse> getReservationById(UUID reservationId) {
-        return reservationRepository.findById(reservationId)
+        log.debug("Fetching reservation by ID: {}", reservationId);
+        Optional<ReservationResponse> response = reservationRepository.findById(reservationId)
                 .map(this::toReservationResponse);
+        if (response.isPresent()) {
+            log.debug("Reservation {} found", reservationId);
+        } else {
+            log.debug("Reservation {} not found", reservationId);
+        }
+        return response;
     }
 
     /**
      * Get all reservations for a user.
      */
     public List<ReservationResponse> getUserReservations(Integer userId) {
-        return reservationRepository.findByUserId(userId).stream()
+        log.debug("Fetching all reservations for user {}", userId);
+        List<ReservationResponse> reservations = reservationRepository.findByUserId(userId).stream()
                 .map(this::toReservationResponse)
                 .collect(Collectors.toList());
+        log.debug("Found {} reservations for user {}", reservations.size(), userId);
+        return reservations;
     }
 
     /**
      * Get user's reservations filtered by status.
      */
     public List<ReservationResponse> getUserReservationsByStatus(Integer userId, ReservationStatus status) {
-        return reservationRepository.findByUserIdAndStatus(userId, status).stream()
+        log.debug("Fetching reservations for user {} with status {}", userId, status);
+        List<ReservationResponse> reservations = reservationRepository.findByUserIdAndStatus(userId, status).stream()
                 .map(this::toReservationResponse)
                 .collect(Collectors.toList());
+        log.debug("Found {} {} reservations for user {}", reservations.size(), status, userId);
+        return reservations;
     }
 
     /**
@@ -310,32 +326,45 @@ public class ReservationService {
 
     private void validateTimes(CreateReservationRequest request) {
         OffsetDateTime now = OffsetDateTime.now();
+        log.debug("Validating reservation times: start={}, end={}", request.getStartTime(), request.getEndTime());
 
         if (request.getStartTime().isAfter(request.getEndTime())) {
+            log.warn("Invalid time range: start {} is after end {}", request.getStartTime(), request.getEndTime());
             throw new InvalidReservationTimeException("Start time must be before end time");
         }
 
         if (request.getStartTime().isBefore(now)) {
+            log.warn("Invalid time: start {} is in the past (now: {})", request.getStartTime(), now);
             throw new InvalidReservationTimeException("Start time must be in the future");
         }
 
-        if (Duration.between(request.getStartTime(), request.getEndTime()).toMinutes() < 15) {
+        long durationMinutes = Duration.between(request.getStartTime(), request.getEndTime()).toMinutes();
+        if (durationMinutes < 15) {
+            log.warn("Invalid duration: {} minutes (minimum 15)", durationMinutes);
             throw new InvalidReservationTimeException("Reservation duration must be at least 15 minutes");
         }
+        
+        log.debug("Time validation passed: duration {} minutes", durationMinutes);
     }
 
     private void validateOperatingHours(Lab lab, OffsetDateTime startTime, OffsetDateTime endTime) {
         // Convert Java DayOfWeek (1=Mon to 7=Sun) to our format (0=Sun to 6=Sat)
         int javaDayValue = startTime.getDayOfWeek().getValue();
         int dayOfWeek = (javaDayValue == 7) ? 0 : javaDayValue;
+        
+        log.debug("Validating operating hours for lab {} on day {} ({})", 
+                lab.getId(), dayOfWeek, startTime.getDayOfWeek());
 
         Optional<LabOperatingHours> operatingHoursOpt = labOperatingHoursRepository
                 .findByLabIdAndDayOfWeek(lab.getId(), dayOfWeek);
 
         if (operatingHoursOpt.isPresent()) {
             LabOperatingHours operatingHours = operatingHoursOpt.get();
+            log.debug("Found specific operating hours: {} - {}, closed: {}", 
+                    operatingHours.getOpenTime(), operatingHours.getCloseTime(), operatingHours.getIsClosed());
 
             if (operatingHours.getIsClosed()) {
+                log.warn("Lab {} is closed on day {}", lab.getId(), dayOfWeek);
                 throw new LabClosedException("Lab is closed on this day");
             }
 
@@ -344,10 +373,13 @@ public class ReservationService {
 
             if (startLocalTime.isBefore(operatingHours.getOpenTime()) || 
                 endLocalTime.isAfter(operatingHours.getCloseTime())) {
+                log.warn("Reservation {} - {} is outside operating hours {} - {}", 
+                        startLocalTime, endLocalTime, operatingHours.getOpenTime(), operatingHours.getCloseTime());
                 throw new OutsideOperatingHoursException("Reservation time must be within operating hours (" 
                         + operatingHours.getOpenTime() + " - " + operatingHours.getCloseTime() + ")");
             }
         } else {
+            log.debug("No specific operating hours found, using lab defaults");
             // No specific hours defined - use lab defaults if available
             if (lab.getDefaultOpenTime() != null && lab.getDefaultCloseTime() != null) {
                 LocalTime startLocalTime = startTime.toLocalTime();
@@ -355,6 +387,8 @@ public class ReservationService {
 
                 if (startLocalTime.isBefore(lab.getDefaultOpenTime()) || 
                     endLocalTime.isAfter(lab.getDefaultCloseTime())) {
+                    log.warn("Reservation {} - {} is outside default operating hours {} - {}", 
+                            startLocalTime, endLocalTime, lab.getDefaultOpenTime(), lab.getDefaultCloseTime());
                     throw new OutsideOperatingHoursException("Reservation time must be within operating hours (" 
                             + lab.getDefaultOpenTime() + " - " + lab.getDefaultCloseTime() + ")");
                 }
@@ -362,40 +396,59 @@ public class ReservationService {
             
             // Check if it's Sunday (default closed)
             if (dayOfWeek == 0) {
+                log.warn("Lab {} is closed on Sundays by default", lab.getId());
                 throw new LabClosedException("Lab is closed on Sundays by default");
             }
         }
+        
+        log.debug("Operating hours validation passed");
     }
 
     private void validateLabNotClosed(Integer labId, LocalDate date) {
         int javaDayValue = date.getDayOfWeek().getValue();
         int dayOfWeek = (javaDayValue == 7) ? 0 : javaDayValue;
+        
+        log.debug("Checking if lab {} is closed on {} (day {})", labId, date, dayOfWeek);
 
         if (labClosedDayRepository.isLabClosedOnDate(labId, date, dayOfWeek)) {
+            log.warn("Lab {} is closed on {}", labId, date);
             throw new LabClosedException("Lab is closed on " + date);
         }
+        
+        log.debug("Lab {} is open on {}", labId, date);
     }
 
     private List<Workstation> validateAndGetWorkstations(Integer labId, List<Integer> workstationIds) {
+        log.debug("Validating workstations {} for lab {}", workstationIds, labId);
+        
         if (workstationIds == null || workstationIds.isEmpty()) {
+            log.warn("No workstations selected for non-whole-lab reservation");
             throw new NoWorkstationsSelectedException();
         }
 
         List<Workstation> workstations = new ArrayList<>();
         for (Integer wsId : workstationIds) {
             Workstation ws = workstationRepository.findById(wsId)
-                    .orElseThrow(() -> new WorkstationNotFoundException(wsId));
+                    .orElseThrow(() -> {
+                        log.warn("Workstation not found: {}", wsId);
+                        return new WorkstationNotFoundException(wsId);
+                    });
             
             if (!ws.getLab().getId().equals(labId)) {
+                log.warn("Workstation {} belongs to lab {} but was requested for lab {}", 
+                        wsId, ws.getLab().getId(), labId);
                 throw new WorkstationNotInLabException(wsId, labId);
             }
             
             if (!ws.getActive()) {
+                log.warn("Workstation {} ({}) is inactive", wsId, ws.getIdentifier());
                 throw new WorkstationInactiveException(ws.getIdentifier());
             }
             
             workstations.add(ws);
         }
+        
+        log.debug("All {} workstations validated successfully", workstations.size());
         return workstations;
     }
 
