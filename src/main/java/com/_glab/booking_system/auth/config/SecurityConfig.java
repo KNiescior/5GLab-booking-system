@@ -17,6 +17,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/**
+ * Security configuration for the application.
+ * 
+ * TODO (Production): Before deployment, review and update:
+ * - CORS: Configure allowed origins for frontend domain
+ * - CSRF: Re-enable if using cookie-based sessions with browser clients
+ * - Public endpoints: Review which /buildings/** and /labs/** should require auth
+ * - HTTPS: Ensure secure cookies and HSTS headers
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -50,12 +59,18 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                // Auth endpoints
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout",
                                 "/api/v1/auth/setup-password",
                                 "/api/v1/auth/mfa/verify",
                                 "/api/v1/auth/mfa/email-code",
+                                // Building & Lab discovery (public)
+                                "/api/v1/buildings",
+                                "/api/v1/buildings/**",
+                                "/api/v1/labs/**",
+                                // Swagger
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
