@@ -47,8 +47,10 @@ public class UserController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<UserResponse> getUserById(@PathVariable Integer id) {
+        log.debug("Fetching user by ID: {}", id);
         UserResponse response = userService.getUserById(id);
         if (response == null) {
+            log.debug("User not found: {}", id);
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(response);
@@ -60,7 +62,9 @@ public class UserController {
     @GetMapping("/check-username")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Boolean>> checkUsername(@RequestParam String username) {
+        log.debug("Checking username availability: {}", username);
         boolean available = userService.isUsernameAvailable(username);
+        log.debug("Username {} is {}", username, available ? "available" : "taken");
         return ResponseEntity.ok(Map.of("available", available));
     }
 
@@ -70,7 +74,9 @@ public class UserController {
     @GetMapping("/check-email")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Boolean>> checkEmail(@RequestParam String email) {
+        log.debug("Checking email availability: {}", email);
         boolean available = userService.isEmailAvailable(email);
+        log.debug("Email {} is {}", email, available ? "available" : "taken");
         return ResponseEntity.ok(Map.of("available", available));
     }
 }
