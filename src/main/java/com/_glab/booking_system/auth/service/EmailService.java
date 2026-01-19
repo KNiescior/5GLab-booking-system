@@ -94,6 +94,135 @@ public class EmailService {
         }
     }
 
+    // ==================== Reservation Emails ====================
+
+    /**
+     * Send confirmation email to user when they submit a reservation.
+     *
+     * @param userEmail     User's email address
+     * @param userName      User's full name
+     * @param labName       Name of the lab
+     * @param startTime     Reservation start time (formatted)
+     * @param endTime       Reservation end time (formatted)
+     * @param isRecurring   Whether this is a recurring reservation
+     * @param occurrenceCount Number of occurrences (for recurring)
+     */
+    @Async
+    public void sendReservationSubmittedEmail(String userEmail, String userName, String labName,
+                                               String startTime, String endTime, 
+                                               boolean isRecurring, int occurrenceCount) {
+        String subject = "5GLab Booking - Reservation Request Submitted";
+        
+        String recurringInfo = isRecurring 
+                ? String.format("\nThis is a recurring reservation with %d occurrences.", occurrenceCount)
+                : "";
+        
+        String body = String.format(
+                "Hello %s,\n\n" +
+                "Your reservation request has been submitted and is pending review.\n\n" +
+                "Details:\n" +
+                "- Lab: %s\n" +
+                "- Start: %s\n" +
+                "- End: %s%s\n\n" +
+                "You will receive another email once a Lab Manager reviews your request.\n\n" +
+                "Best regards,\n" +
+                "5GLab Booking System",
+                userName, labName, startTime, endTime, recurringInfo
+        );
+
+        sendEmail(userEmail, subject, body);
+        log.info("Reservation submitted email sent to {}", userEmail);
+    }
+
+    /**
+     * Send notification email to lab manager when a new reservation request is submitted.
+     *
+     * @param managerEmail  Lab manager's email address
+     * @param managerName   Lab manager's name
+     * @param labName       Name of the lab
+     * @param requesterName Name of the user who submitted the request
+     * @param startTime     Reservation start time (formatted)
+     * @param endTime       Reservation end time (formatted)
+     * @param isRecurring   Whether this is a recurring reservation
+     * @param occurrenceCount Number of occurrences (for recurring)
+     */
+    @Async
+    public void sendNewReservationRequestEmail(String managerEmail, String managerName, String labName,
+                                                String requesterName, String startTime, String endTime,
+                                                boolean isRecurring, int occurrenceCount) {
+        String subject = "5GLab Booking - New Reservation Request for " + labName;
+        
+        String recurringInfo = isRecurring 
+                ? String.format("\nThis is a recurring reservation with %d occurrences.", occurrenceCount)
+                : "";
+        
+        String frontendUrl = appProperties.getFrontend().getUrl();
+        
+        String body = String.format(
+                "Hello %s,\n\n" +
+                "A new reservation request has been submitted for your lab.\n\n" +
+                "Details:\n" +
+                "- Lab: %s\n" +
+                "- Requested by: %s\n" +
+                "- Start: %s\n" +
+                "- End: %s%s\n\n" +
+                "Please log in to review and approve/reject this request:\n" +
+                "%s/manager/reservations\n\n" +
+                "Best regards,\n" +
+                "5GLab Booking System",
+                managerName, labName, requesterName, startTime, endTime, recurringInfo, frontendUrl
+        );
+
+        sendEmail(managerEmail, subject, body);
+        log.info("New reservation request email sent to manager {}", managerEmail);
+    }
+
+    /**
+     * Send notification email when a reservation status changes.
+     *
+     * @param userEmail   User's email address
+     * @param userName    User's full name
+     * @param labName     Name of the lab
+     * @param startTime   Reservation start time (formatted)
+     * @param endTime     Reservation end time (formatted)
+     * @param newStatus   New status (APPROVED, REJECTED, CANCELLED)
+     * @param reason      Optional reason for the status change
+     */
+    @Async
+    public void sendReservationStatusChangeEmail(String userEmail, String userName, String labName,
+                                                  String startTime, String endTime, 
+                                                  String newStatus, String reason) {
+        String subject = String.format("5GLab Booking - Reservation %s", newStatus);
+        
+        String statusMessage = switch (newStatus.toUpperCase()) {
+            case "APPROVED" -> "Your reservation has been approved!";
+            case "REJECTED" -> "Unfortunately, your reservation has been rejected.";
+            case "CANCELLED" -> "Your reservation has been cancelled.";
+            default -> "Your reservation status has been updated to: " + newStatus;
+        };
+        
+        String reasonInfo = (reason != null && !reason.isBlank()) 
+                ? String.format("\nReason: %s", reason) 
+                : "";
+        
+        String body = String.format(
+                "Hello %s,\n\n" +
+                "%s\n\n" +
+                "Details:\n" +
+                "- Lab: %s\n" +
+                "- Start: %s\n" +
+                "- End: %s%s\n\n" +
+                "Best regards,\n" +
+                "5GLab Booking System",
+                userName, statusMessage, labName, startTime, endTime, reasonInfo
+        );
+
+        sendEmail(userEmail, subject, body);
+        log.info("Reservation status change ({}) email sent to {}", newStatus, userEmail);
+    }
+
+    // ==================== Helper Methods ====================
+
     /**
      * Build the password setup URL for the frontend.
      */
