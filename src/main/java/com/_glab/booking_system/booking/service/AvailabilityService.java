@@ -137,6 +137,7 @@ public class AvailabilityService {
 
         return LabWorkstationsResponse.builder()
                 .labId(labId)
+                .labName(lab.getName())
                 .workstations(workstationResponses)
                 .build();
     }
