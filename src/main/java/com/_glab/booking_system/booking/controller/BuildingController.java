@@ -30,7 +30,10 @@ public class BuildingController {
      */
     @GetMapping
     public ResponseEntity<List<Building>> getBuildings() {
-        return ResponseEntity.ok(buildingService.getBuildings());
+        log.debug("Fetching all buildings");
+        List<Building> buildings = buildingService.getBuildings();
+        log.debug("Found {} buildings", buildings.size());
+        return ResponseEntity.ok(buildings);
     }
 
     /**
@@ -38,6 +41,9 @@ public class BuildingController {
      */
     @GetMapping("/{buildingId}/labs")
     public ResponseEntity<List<Lab>> getLabsByBuilding(@PathVariable Integer buildingId) {
-        return ResponseEntity.ok(labService.getLabsByBuildingId(buildingId));
+        log.debug("Fetching labs for building {}", buildingId);
+        List<Lab> labs = labService.getLabsByBuildingId(buildingId);
+        log.debug("Found {} labs in building {}", labs.size(), buildingId);
+        return ResponseEntity.ok(labs);
     }
 }

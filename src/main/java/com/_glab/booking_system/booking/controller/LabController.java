@@ -35,9 +35,16 @@ public class LabController {
      */
     @GetMapping("/{labId}")
     public ResponseEntity<Lab> getLabById(@PathVariable Integer labId) {
+        log.debug("Fetching lab by ID: {}", labId);
         return labService.getLabById(labId)
-                .map(ResponseEntity::ok)
-                .orElseThrow(() -> new LabNotFoundException(labId));
+                .map(lab -> {
+                    log.debug("Lab {} found: {}", labId, lab.getName());
+                    return ResponseEntity.ok(lab);
+                })
+                .orElseThrow(() -> {
+                    log.warn("Lab not found: {}", labId);
+                    return new LabNotFoundException(labId);
+                });
     }
 
     /**

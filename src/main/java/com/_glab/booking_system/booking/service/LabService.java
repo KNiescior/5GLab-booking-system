@@ -9,18 +9,30 @@ import com._glab.booking_system.booking.model.Lab;
 import com._glab.booking_system.booking.repository.LabRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class LabService {
 
     private final LabRepository labRepository;
 
     public List<Lab> getLabsByBuildingId(Integer buildingId) {
-        return labRepository.findByBuildingId(buildingId);
+        log.debug("Retrieving labs for building {}", buildingId);
+        List<Lab> labs = labRepository.findByBuildingId(buildingId);
+        log.debug("Found {} labs in building {}", labs.size(), buildingId);
+        return labs;
     }
 
     public Optional<Lab> getLabById(Integer labId) {
-        return labRepository.findById(labId);
+        log.debug("Retrieving lab by ID: {}", labId);
+        Optional<Lab> lab = labRepository.findById(labId);
+        if (lab.isPresent()) {
+            log.debug("Lab {} found: {}", labId, lab.get().getName());
+        } else {
+            log.debug("Lab {} not found", labId);
+        }
+        return lab;
     }
 }
