@@ -23,7 +23,10 @@ import com._glab.booking_system.booking.model.Reservation;
 import com._glab.booking_system.booking.model.ReservationStatus;
 import com._glab.booking_system.booking.model.ReservationWorkstation;
 import com._glab.booking_system.booking.model.Workstation;
+import com._glab.booking_system.auth.service.EmailService;
+import com._glab.booking_system.booking.model.LabManager;
 import com._glab.booking_system.booking.repository.LabClosedDayRepository;
+import com._glab.booking_system.booking.repository.LabManagerRepository;
 import com._glab.booking_system.booking.repository.LabOperatingHoursRepository;
 import com._glab.booking_system.booking.repository.LabRepository;
 import com._glab.booking_system.booking.repository.RecurringPatternRepository;
@@ -50,6 +53,8 @@ public class ReservationService {
     private final WorkstationRepository workstationRepository;
     private final ReservationWorkstationRepository reservationWorkstationRepository;
     private final RecurringPatternRepository recurringPatternRepository;
+    private final LabManagerRepository labManagerRepository;
+    private final EmailService emailService;
 
     /**
      * Get all reservations for a lab.
@@ -182,6 +187,16 @@ public class ReservationService {
         log.info("Created recurring reservation group {} with {} occurrences", 
                 recurringGroupId, reservationResponses.size());
 
+        // Send email notifications for the recurring series
+        Lab lab = labRepository.findById(request.getLabId()).orElse(null);
+        if (lab != null && !reservationResponses.isEmpty()) {
+            ReservationResponse firstRes = reservationResponses.get(0);
+            Reservation firstReservation = reservationRepository.findById(firstRes.getId()).orElse(null);
+            if (firstReservation != null) {
+                sendReservationEmails(firstReservation, user, lab, true, reservationResponses.size());
+            }
+        }
+
         return RecurringReservationResponse.builder()
                 .recurringGroupId(recurringGroupId)
                 .patternType(patternType)
@@ -238,6 +253,11 @@ public class ReservationService {
 
         log.info("Created reservation {} for user {} in lab {}", 
                 savedReservation.getId(), user.getEmail(), lab.getName());
+
+        // Send email notifications (only for non-recurring or first occurrence)
+        if (recurringGroupId == null) {
+            sendReservationEmails(savedReservation, user, lab, false, 1);
+        }
 
         return toReservationResponse(savedReservation, 
                 workstations.stream().map(Workstation::getId).collect(Collectors.toList()));
@@ -376,6 +396,56 @@ public class ReservationService {
             workstations.add(ws);
         }
         return workstations;
+    }
+
+    // === Email Notifications ===
+
+    /**
+     * Send email notifications for a new reservation.
+     * Notifies the user and lab manager(s).
+     */
+    private void sendReservationEmails(Reservation reservation, User user, Lab lab, 
+                                        boolean isRecurring, int occurrenceCount) {
+        try {
+            String userName = user.getFirstName() + " " + user.getLastName();
+            String startTimeFormatted = reservation.getStartTime().toString();
+            String endTimeFormatted = reservation.getEndTime().toString();
+
+            // Send confirmation to user
+            emailService.sendReservationSubmittedEmail(
+                    user.getEmail(),
+                    userName,
+                    lab.getName(),
+                    startTimeFormatted,
+                    endTimeFormatted,
+                    isRecurring,
+                    occurrenceCount
+            );
+
+            // Send notification to lab manager(s)
+            List<LabManager> managers = labManagerRepository.findByLab(lab);
+            for (LabManager manager : managers) {
+                User managerUser = manager.getUser();
+                String managerName = managerUser.getFirstName() + " " + managerUser.getLastName();
+                
+                emailService.sendNewReservationRequestEmail(
+                        managerUser.getEmail(),
+                        managerName,
+                        lab.getName(),
+                        userName,
+                        startTimeFormatted,
+                        endTimeFormatted,
+                        isRecurring,
+                        occurrenceCount
+                );
+            }
+
+            log.info("Sent reservation notification emails for reservation {} (managers notified: {})", 
+                    reservation.getId(), managers.size());
+        } catch (Exception e) {
+            // Log but don't fail the reservation creation if email fails
+            log.error("Failed to send reservation notification emails: {}", e.getMessage());
+        }
     }
 
     // === Response Mapping ===
