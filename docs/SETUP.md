@@ -95,6 +95,39 @@ curl http://localhost:8080/actuator/health
 # Navigate to: http://localhost:8080/swagger-ui.html
 ```
 
+## Test Users (Development Only)
+
+When running with the `dev` profile, the application automatically creates test users on startup:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@5glab.com` | `admin123` |
+| Professor | `professor@5glab.com` | `prof123` |
+
+### Login to Get JWT Token
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@5glab.com","password":"admin123"}'
+```
+
+Response:
+```json
+{
+  "accessToken": "eyJhbGciOiJSUzI1NiIs...",
+  "user": { "id": 1, "email": "admin@5glab.com", "role": "ADMIN" }
+}
+```
+
+Use the `accessToken` in subsequent requests:
+```bash
+curl -X GET http://localhost:8080/api/v1/users/1 \
+  -H "Authorization: Bearer <your_access_token>"
+```
+
+> **Warning**: These test users are created by `DataInitializer.java`. Both this file and the test users must be removed before production deployment.
+
 ## Environment Configuration
 
 ### Development Environment Variables
@@ -306,4 +339,5 @@ git push origin feature/your-feature-name
 
 - Read the [API Documentation](API.md) to understand available endpoints
 - Review the [Architecture Guide](ARCHITECTURE.md) for system design
+- When ready for production, see the [Deployment Guide](DEPLOYMENT.md)
 
