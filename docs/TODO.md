@@ -46,11 +46,21 @@ This document tracks planned features and improvements for the 5GLab Booking Sys
 
 ## Completed ✅
 
+### Authentication & User Management
 - [x] JWT Authentication with refresh tokens
 - [x] MFA (TOTP, Email OTP, Backup codes)
 - [x] User registration (admin-only)
-- [x] Building & Lab discovery API
-- [x] Availability service
-- [x] Reservation creation
-- [x] Recurring reservations
-- [x] Email notifications on submission
+- [x] Account lockout policy (tiered: 3 attempts → 10 min, 6+ → 30 min)
+- [x] Token reuse detection security
+
+### Lab Booking System (from lab_booking_form plan)
+- [x] Database entities: Building, Lab, Workstation, LabManager, LabOperatingHours, LabClosedDay, Reservation, ReservationWorkstation, RecurringPattern
+- [x] JPA repositories with custom queries for availability lookups
+- [x] Building & Lab discovery API (`GET /buildings`, `GET /buildings/{id}/labs`, `GET /labs/{id}`)
+- [x] Availability service with weekly availability and current status
+- [x] Availability endpoints (`GET /labs/{id}/availability`, `/availability/current`, `/workstations`)
+- [x] Reservation service with validation (time range, operating hours, lab closures, workstation validation)
+- [x] Reservation creation endpoint (`POST /reservations`)
+- [x] Get reservation endpoints (`GET /reservations/{id}`, `GET /reservations/me`)
+- [x] Recurring reservation pattern support (WEEKLY, BIWEEKLY, MONTHLY, CUSTOM)
+- [x] Email notifications for reservation submission (user confirmation + lab manager notification)

@@ -261,7 +261,7 @@ When a refresh token is used after it has been rotated:
 
 ## Database Schema
 
-### Entity Relationship Diagram
+### User & Authentication Entities
 
 ```
 ┌─────────────────────┐       ┌─────────────────────┐
@@ -323,6 +323,85 @@ When a refresh token is used after it has been rotated:
 │ used_at             │
 │ created_at          │
 └─────────────────────┘
+```
+
+### Booking Entities
+
+```
+┌─────────────────────┐       ┌─────────────────────┐
+│      building       │       │         lab         │
+├─────────────────────┤       ├─────────────────────┤
+│ id (PK)             │◄──────│ id (PK)             │
+│ name                │       │ building_id (FK)    │
+│ description         │       │ name                │
+│ address             │       │ description         │
+│ city                │       │ capacity            │
+│ created_at          │       │ default_open_time   │
+│ last_modified_at    │       │ default_close_time  │
+└─────────────────────┘       │ created_at          │
+                              │ last_modified_at    │
+                              └──────────┬──────────┘
+                                         │
+           ┌─────────────────────────────┼─────────────────────────────┐
+           │                             │                             │
+           ▼                             ▼                             ▼
+┌─────────────────────┐       ┌─────────────────────┐       ┌─────────────────────┐
+│    workstation      │       │ lab_operating_hours │       │   lab_closed_day    │
+├─────────────────────┤       ├─────────────────────┤       ├─────────────────────┤
+│ id (PK)             │       │ id (PK)             │       │ id (PK)             │
+│ lab_id (FK)         │       │ lab_id (FK)         │       │ lab_id (FK)         │
+│ identifier          │       │ day_of_week         │       │ specific_date       │
+│ description         │       │ open_time           │       │ recurring_day       │
+│ active              │       │ close_time          │       │ reason              │
+│ created_at          │       │ is_closed           │       └─────────────────────┘
+└─────────────────────┘       └─────────────────────┘
+
+┌─────────────────────┐       ┌─────────────────────┐
+│     lab_manager     │       │     reservation     │
+├─────────────────────┤       ├─────────────────────┤
+│ id (PK)             │       │ id (UUID PK)        │
+│ user_id (FK)        │       │ user_id (FK)        │
+│ lab_id (FK)         │       │ lab_id (FK)         │
+│ is_primary          │       │ start_time          │
+│ assigned_at         │       │ end_time            │
+└─────────────────────┘       │ description         │
+                              │ status              │
+                              │ whole_lab           │
+                              │ recurring_group_id  │
+                              │ created_at          │
+                              └──────────┬──────────┘
+                                         │
+           ┌─────────────────────────────┴─────────────────────────────┐
+           │                                                           │
+           ▼                                                           ▼
+┌─────────────────────────┐                             ┌─────────────────────────┐
+│ reservation_workstation │                             │   recurring_pattern     │
+├─────────────────────────┤                             ├─────────────────────────┤
+│ reservation_id (FK, PK) │                             │ id (UUID PK)            │
+│ workstation_id (FK, PK) │                             │ reservation_id (FK)     │
+└─────────────────────────┘                             │ pattern_type            │
+                                                        │ interval_days           │
+                                                        │ end_date                │
+                                                        │ occurrences             │
+                                                        └─────────────────────────┘
+```
+
+### Booking Enums
+
+```java
+public enum ReservationStatus {
+    PENDING,    // Awaiting lab manager review
+    APPROVED,   // Approved by lab manager
+    REJECTED,   // Rejected by lab manager
+    CANCELLED   // Cancelled by user
+}
+
+public enum RecurrenceType {
+    WEEKLY,     // Every week
+    BIWEEKLY,   // Every two weeks
+    MONTHLY,    // Monthly on same day
+    CUSTOM      // Every N days (intervalDays)
+}
 ```
 
 ## Security Architecture
@@ -564,6 +643,73 @@ com._glab.booking_system
 │   └── service/
 │       └── UserService           # User registration logic
 │
+├── booking/                       # Lab Booking Module
+│   ├── controller/
+│   │   ├── BuildingController    # Building discovery endpoints
+│   │   ├── LabController         # Lab details & availability
+│   │   └── ReservationController # Reservation CRUD
+│   │
+│   ├── exception/
+│   │   ├── LabNotFoundException
+│   │   ├── BuildingNotFoundException
+│   │   ├── WorkstationNotFoundException
+│   │   ├── ReservationNotFoundException
+│   │   ├── InvalidReservationTimeException
+│   │   ├── OutsideOperatingHoursException
+│   │   ├── LabClosedException
+│   │   ├── WorkstationNotInLabException
+│   │   ├── WorkstationInactiveException
+│   │   ├── NoWorkstationsSelectedException
+│   │   ├── InvalidRecurringPatternException
+│   │   ├── NoValidOccurrencesException
+│   │   └── BookingNotAuthorizedException
+│   │
+│   ├── exception_handler/
+│   │   └── BookingExceptionHandler  # Booking-specific error handling
+│   │
+│   ├── model/
+│   │   ├── Building              # Building entity
+│   │   ├── Lab                   # Lab entity
+│   │   ├── Workstation           # Individual workstation
+│   │   ├── LabManager            # User-Lab management junction
+│   │   ├── LabOperatingHours     # Per-day operating hours
+│   │   ├── LabClosedDay          # Specific closure dates
+│   │   ├── Reservation           # Booking request
+│   │   ├── ReservationWorkstation# Reservation-Workstation junction
+│   │   ├── RecurringPattern      # Recurrence configuration
+│   │   ├── ReservationStatus     # PENDING/APPROVED/REJECTED/CANCELLED
+│   │   └── RecurrenceType        # WEEKLY/BIWEEKLY/MONTHLY/CUSTOM
+│   │
+│   ├── repository/
+│   │   ├── BuildingRepository
+│   │   ├── LabRepository
+│   │   ├── WorkstationRepository
+│   │   ├── LabManagerRepository
+│   │   ├── LabOperatingHoursRepository
+│   │   ├── LabClosedDayRepository
+│   │   ├── ReservationRepository
+│   │   └── RecurringPatternRepository
+│   │
+│   ├── request/
+│   │   └── CreateReservationRequest  # Reservation creation DTO
+│   │
+│   ├── response/
+│   │   ├── LabAvailabilityResponse   # Weekly availability grid
+│   │   ├── CurrentAvailabilityResponse
+│   │   ├── LabWorkstationsResponse
+│   │   ├── ReservationResponse
+│   │   ├── RecurringReservationResponse
+│   │   ├── ReservationSummaryResponse
+│   │   ├── OperatingHoursResponse
+│   │   ├── ClosedDayResponse
+│   │   └── WorkstationResponse
+│   │
+│   └── service/
+│       ├── BuildingService       # Building operations
+│       ├── LabService            # Lab operations
+│       ├── AvailabilityService   # Availability calculations
+│       └── ReservationService    # Reservation logic & validation
+│
 ├── ErrorResponse                  # Global error format
 ├── ErrorResponseCode              # Error code enum
 └── BookingSystemApplication       # Main class
@@ -660,6 +806,89 @@ A short-lived JWT (5 minutes) issued after password verification:
 - Format: `XXXX-XXXX` (alphanumeric, excluding similar chars like 0/O, 1/I)
 - Stored as BCrypt hashes
 - Each code can only be used once
+
+---
+
+## Lab Booking System Design
+
+### Key Design Decisions
+
+1. **No Hard Blocking**: Neither APPROVED nor PENDING reservations block workstation selection. Users can always select any workstation - the API returns reservation data so the frontend can visually warn users about conflicts. Lab managers make the final approval decision.
+
+2. **Recurring Reservations**: Each occurrence is a separate `Reservation` row linked by `recurring_group_id` (UUID). This allows individual occurrence management (edit/cancel one without affecting others).
+
+3. **Lab Managers**: Many-to-many relationship via `LabManager` table with `is_primary` flag. Multiple users can manage a single lab. Admins can approve any lab as fallback.
+
+4. **Operating Hours**: Stored per day-of-week per lab in `LabOperatingHours`. Default hours (8:00-20:00 weekdays) applied at lab creation. Sundays closed by default via `LabClosedDay`.
+
+5. **Availability Response**: Returns standard JSON with arrays of reservations, operating hours, and closed days. Frontend handles rendering and conflict visualization.
+
+### Booking Flow
+
+```
+┌────────┐      ┌─────────────────────┐      ┌────────────────────┐
+│ User   │      │ ReservationController│     │ ReservationService │
+└───┬────┘      └──────────┬──────────┘      └─────────┬──────────┘
+    │                      │                           │
+    │ POST /reservations   │                           │
+    │ {labId, startTime,   │                           │
+    │  endTime, ...}       │                           │
+    │─────────────────────>│                           │
+    │                      │                           │
+    │                      │ createReservation()       │
+    │                      │──────────────────────────>│
+    │                      │                           │
+    │                      │   Validate:               │
+    │                      │   - Time range valid      │
+    │                      │   - Within operating hrs  │
+    │                      │   - Lab not closed        │
+    │                      │   - Workstations exist    │
+    │                      │   - Workstations active   │
+    │                      │                           │
+    │                      │   Create Reservation      │
+    │                      │   (status=PENDING)        │
+    │                      │                           │
+    │                      │   Send emails:            │
+    │                      │   - Confirmation to user  │
+    │                      │   - Notification to       │
+    │                      │     lab manager(s)        │
+    │                      │                           │
+    │                      │      ReservationResponse  │
+    │                      │<──────────────────────────│
+    │                      │                           │
+    │ 201 Created          │                           │
+    │ {id, status:PENDING} │                           │
+    │<─────────────────────│                           │
+```
+
+### Recurring Reservation Flow
+
+```
+┌────────┐                                    ┌────────────────────┐
+│ User   │                                    │ ReservationService │
+└───┬────┘                                    └─────────┬──────────┘
+    │                                                   │
+    │ POST /reservations                                │
+    │ {..., recurring: {patternType: WEEKLY,            │
+    │                   endDate: "2026-03-20"}}         │
+    │──────────────────────────────────────────────────>│
+    │                                                   │
+    │                       Generate recurring_group_id │
+    │                       (UUID)                      │
+    │                                                   │
+    │                       For each occurrence date:   │
+    │                       ├─ Skip if lab closed       │
+    │                       ├─ Skip if outside hours    │
+    │                       └─ Create Reservation       │
+    │                          (linked by group_id)     │
+    │                                                   │
+    │                       Send emails once for group  │
+    │                                                   │
+    │ 201 Created                                       │
+    │ {recurringGroupId, totalOccurrences,              │
+    │  reservations: [...]}                             │
+    │<──────────────────────────────────────────────────│
+```
 
 ---
 

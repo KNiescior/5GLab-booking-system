@@ -411,6 +411,515 @@ Authorization: Bearer <access_token>
 
 ---
 
+## Lab Booking Endpoints
+
+Endpoints for discovering buildings/labs and creating reservations.
+
+### Building Endpoints
+
+#### GET /buildings
+
+List all buildings.
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request
+
+```http
+GET /api/v1/buildings
+Authorization: Bearer <access_token>
+```
+
+##### Response (200 OK)
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Main Engineering Building",
+    "description": "Primary engineering facility",
+    "address": "123 University Ave",
+    "city": "Warsaw",
+    "createdAt": "2026-01-15T10:00:00Z",
+    "lastModifiedAt": "2026-01-15T10:00:00Z"
+  }
+]
+```
+
+---
+
+#### GET /buildings/{buildingId}/labs
+
+List all labs in a specific building.
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request
+
+```http
+GET /api/v1/buildings/1/labs
+Authorization: Bearer <access_token>
+```
+
+##### Response (200 OK)
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Computer Lab A",
+    "description": "General purpose computer lab",
+    "capacity": 30,
+    "defaultOpenTime": "08:00:00",
+    "defaultCloseTime": "20:00:00",
+    "createdAt": "2026-01-15T10:00:00Z",
+    "lastModifiedAt": "2026-01-15T10:00:00Z",
+    "building": {
+      "id": 1,
+      "name": "Main Engineering Building"
+    }
+  }
+]
+```
+
+---
+
+### Lab Endpoints
+
+#### GET /labs/{labId}
+
+Get detailed information about a specific lab.
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request
+
+```http
+GET /api/v1/labs/1
+Authorization: Bearer <access_token>
+```
+
+##### Response (200 OK)
+
+```json
+{
+  "id": 1,
+  "name": "Computer Lab A",
+  "description": "General purpose computer lab",
+  "capacity": 30,
+  "defaultOpenTime": "08:00:00",
+  "defaultCloseTime": "20:00:00",
+  "createdAt": "2026-01-15T10:00:00Z",
+  "lastModifiedAt": "2026-01-15T10:00:00Z",
+  "building": {
+    "id": 1,
+    "name": "Main Engineering Building"
+  }
+}
+```
+
+##### Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `BOOKING_LAB_NOT_FOUND` | Lab with the specified ID does not exist |
+
+---
+
+#### GET /labs/{labId}/availability
+
+Get weekly availability for a lab, including operating hours, closed days, and existing reservations.
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request
+
+```http
+GET /api/v1/labs/1/availability?week=2026-01-19
+Authorization: Bearer <access_token>
+```
+
+**Query Parameters**:
+- `week` (optional) - ISO date (YYYY-MM-DD) for the week start. Defaults to current week if not provided.
+
+##### Response (200 OK)
+
+```json
+{
+  "labId": 1,
+  "labName": "Computer Lab A",
+  "weekStart": "2026-01-19",
+  "weekEnd": "2026-01-25",
+  "operatingHours": [
+    { "dayOfWeek": 1, "open": "08:00:00", "close": "20:00:00", "closed": false },
+    { "dayOfWeek": 2, "open": "08:00:00", "close": "20:00:00", "closed": false },
+    { "dayOfWeek": 3, "open": "08:00:00", "close": "20:00:00", "closed": false },
+    { "dayOfWeek": 4, "open": "08:00:00", "close": "20:00:00", "closed": false },
+    { "dayOfWeek": 5, "open": "08:00:00", "close": "20:00:00", "closed": false },
+    { "dayOfWeek": 6, "open": "10:00:00", "close": "16:00:00", "closed": false },
+    { "dayOfWeek": 0, "open": null, "close": null, "closed": true }
+  ],
+  "closedDays": [
+    { "date": "2026-01-21", "reason": "Maintenance" }
+  ],
+  "reservations": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "date": "2026-01-20",
+      "startTime": "10:00:00",
+      "endTime": "12:00:00",
+      "status": "APPROVED",
+      "wholeLab": false,
+      "workstationIds": [1, 2, 3],
+      "userName": "John Doe"
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440001",
+      "date": "2026-01-20",
+      "startTime": "14:00:00",
+      "endTime": "16:00:00",
+      "status": "PENDING",
+      "wholeLab": true,
+      "workstationIds": [],
+      "userName": "Jane Smith"
+    }
+  ]
+}
+```
+
+**Notes**:
+- `dayOfWeek` uses ISO standard: 1 = Monday, 7 = Sunday, 0 = Sunday (alternate)
+- `operatingHours` shows per-day schedule; if `closed` is true, the lab is closed that day
+- `closedDays` lists specific dates when the lab is closed (holidays, maintenance)
+- `reservations` includes both PENDING and APPROVED reservations for frontend to display
+
+##### Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `BOOKING_LAB_NOT_FOUND` | Lab with the specified ID does not exist |
+
+---
+
+#### GET /labs/{labId}/availability/current
+
+Get current availability status for a lab (what's happening right now).
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request
+
+```http
+GET /api/v1/labs/1/availability/current
+Authorization: Bearer <access_token>
+```
+
+##### Response (200 OK)
+
+```json
+{
+  "labId": 1,
+  "labName": "Computer Lab A",
+  "isOpen": true,
+  "currentReservations": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "date": "2026-01-19",
+      "startTime": "10:00:00",
+      "endTime": "12:00:00",
+      "status": "APPROVED",
+      "wholeLab": false,
+      "workstationIds": [1, 2, 3],
+      "userName": "John Doe"
+    }
+  ]
+}
+```
+
+##### Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `BOOKING_LAB_NOT_FOUND` | Lab with the specified ID does not exist |
+
+---
+
+#### GET /labs/{labId}/workstations
+
+List all workstations in a lab.
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request
+
+```http
+GET /api/v1/labs/1/workstations
+Authorization: Bearer <access_token>
+```
+
+##### Response (200 OK)
+
+```json
+{
+  "labId": 1,
+  "labName": "Computer Lab A",
+  "workstations": [
+    {
+      "id": 1,
+      "identifier": "WS-01",
+      "description": "Window seat with dual monitors",
+      "active": true
+    },
+    {
+      "id": 2,
+      "identifier": "WS-02",
+      "description": null,
+      "active": true
+    },
+    {
+      "id": 3,
+      "identifier": "WS-03",
+      "description": "Near power outlet",
+      "active": false
+    }
+  ]
+}
+```
+
+**Notes**:
+- `active` indicates if the workstation is available for booking
+- Inactive workstations cannot be selected for reservations
+
+##### Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `BOOKING_LAB_NOT_FOUND` | Lab with the specified ID does not exist |
+
+---
+
+### Reservation Endpoints
+
+#### POST /reservations
+
+Create a new reservation (single or recurring).
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request - Single Reservation
+
+```http
+POST /api/v1/reservations
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "labId": 1,
+  "startTime": "2026-01-20T10:00:00+01:00",
+  "endTime": "2026-01-20T12:00:00+01:00",
+  "description": "Project work session",
+  "wholeLab": false,
+  "workstationIds": [1, 2]
+}
+```
+
+##### Request - Recurring Reservation
+
+```http
+POST /api/v1/reservations
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "labId": 1,
+  "startTime": "2026-01-20T10:00:00+01:00",
+  "endTime": "2026-01-20T12:00:00+01:00",
+  "description": "Weekly team meeting",
+  "wholeLab": true,
+  "workstationIds": [],
+  "recurring": {
+    "patternType": "WEEKLY",
+    "endDate": "2026-03-20",
+    "occurrences": null
+  }
+}
+```
+
+**Fields**:
+- `labId` (required) - ID of the lab to book
+- `startTime` (required) - ISO 8601 datetime with timezone
+- `endTime` (required) - ISO 8601 datetime with timezone
+- `description` (optional) - Purpose of the reservation
+- `wholeLab` (optional, default: false) - Book the entire lab
+- `workstationIds` (required if `wholeLab` is false) - Array of workstation IDs to reserve
+- `recurring` (optional) - Recurring pattern configuration:
+  - `patternType` - One of: `WEEKLY`, `BIWEEKLY`, `MONTHLY`, `CUSTOM`
+  - `intervalDays` - Custom interval in days (required for `CUSTOM` pattern)
+  - `endDate` - End date for recurrence (ISO date string)
+  - `occurrences` - Number of occurrences (alternative to `endDate`)
+
+##### Response - Single Reservation (201 Created)
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "labId": 1,
+  "labName": "Computer Lab A",
+  "startTime": "2026-01-20T10:00:00+01:00",
+  "endTime": "2026-01-20T12:00:00+01:00",
+  "description": "Project work session",
+  "status": "PENDING",
+  "wholeLab": false,
+  "workstationIds": [1, 2],
+  "recurringGroupId": null,
+  "createdAt": "2026-01-19T14:30:00Z"
+}
+```
+
+##### Response - Recurring Reservation (201 Created)
+
+```json
+{
+  "recurringGroupId": "660e8400-e29b-41d4-a716-446655440000",
+  "patternType": "WEEKLY",
+  "totalOccurrences": 9,
+  "reservations": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "labId": 1,
+      "labName": "Computer Lab A",
+      "startTime": "2026-01-20T10:00:00+01:00",
+      "endTime": "2026-01-20T12:00:00+01:00",
+      "description": "Weekly team meeting",
+      "status": "PENDING",
+      "wholeLab": true,
+      "workstationIds": [],
+      "recurringGroupId": "660e8400-e29b-41d4-a716-446655440000",
+      "createdAt": "2026-01-19T14:30:00Z"
+    }
+  ]
+}
+```
+
+**Notes**:
+- All new reservations are created with `PENDING` status
+- Email notifications are sent to the user and lab manager(s) upon submission
+- Recurring reservations create individual `Reservation` records linked by `recurringGroupId`
+- The system does NOT block conflicting reservations - lab managers review and approve/reject
+
+##### Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 400 | `BOOKING_INVALID_TIME_RANGE` | End time before start time, or in the past |
+| 400 | `BOOKING_OUTSIDE_OPERATING_HOURS` | Reservation outside lab operating hours |
+| 400 | `BOOKING_LAB_CLOSED` | Lab is closed on the requested date |
+| 400 | `BOOKING_WORKSTATION_NOT_IN_LAB` | Workstation doesn't belong to the lab |
+| 400 | `BOOKING_WORKSTATION_INACTIVE` | Workstation is not active |
+| 400 | `BOOKING_NO_WORKSTATIONS_SELECTED` | `wholeLab` is false but no workstations provided |
+| 400 | `BOOKING_INVALID_RECURRING_PATTERN` | Invalid recurring configuration |
+| 400 | `BOOKING_NO_VALID_OCCURRENCES` | Recurring pattern produces no valid dates |
+| 404 | `BOOKING_LAB_NOT_FOUND` | Lab with the specified ID does not exist |
+| 404 | `BOOKING_WORKSTATION_NOT_FOUND` | Workstation with the specified ID does not exist |
+
+---
+
+#### GET /reservations/{id}
+
+Get a reservation by ID.
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request
+
+```http
+GET /api/v1/reservations/550e8400-e29b-41d4-a716-446655440000
+Authorization: Bearer <access_token>
+```
+
+##### Response (200 OK)
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "labId": 1,
+  "labName": "Computer Lab A",
+  "startTime": "2026-01-20T10:00:00+01:00",
+  "endTime": "2026-01-20T12:00:00+01:00",
+  "description": "Project work session",
+  "status": "PENDING",
+  "wholeLab": false,
+  "workstationIds": [1, 2],
+  "recurringGroupId": null,
+  "createdAt": "2026-01-19T14:30:00Z"
+}
+```
+
+##### Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `BOOKING_RESERVATION_NOT_FOUND` | Reservation with the specified ID does not exist |
+
+---
+
+#### GET /reservations/me
+
+Get the current user's reservations.
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request
+
+```http
+GET /api/v1/reservations/me
+Authorization: Bearer <access_token>
+```
+
+##### Response (200 OK)
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "labId": 1,
+    "labName": "Computer Lab A",
+    "startTime": "2026-01-20T10:00:00+01:00",
+    "endTime": "2026-01-20T12:00:00+01:00",
+    "description": "Project work session",
+    "status": "PENDING",
+    "wholeLab": false,
+    "workstationIds": [1, 2],
+    "recurringGroupId": null,
+    "createdAt": "2026-01-19T14:30:00Z"
+  }
+]
+```
+
+---
+
+### Reservation Status Values
+
+| Status | Description |
+|--------|-------------|
+| `PENDING` | Awaiting lab manager review |
+| `APPROVED` | Approved by lab manager |
+| `REJECTED` | Rejected by lab manager |
+| `CANCELLED` | Cancelled by the user |
+
+---
+
+### Recurrence Pattern Types
+
+| Pattern | Description |
+|---------|-------------|
+| `WEEKLY` | Repeats every week on the same day |
+| `BIWEEKLY` | Repeats every two weeks |
+| `MONTHLY` | Repeats monthly on the same day of month |
+| `CUSTOM` | Repeats every N days (specify `intervalDays`) |
+
+---
+
 ## User Management Endpoints
 
 User management endpoints for admin operations.
@@ -646,6 +1155,24 @@ All API errors follow this format:
 | Code | HTTP Status | Description |
 |------|-------------|-------------|
 | `USER_EMAIL_NOT_VALID` | 400 | Email format is invalid |
+
+#### Booking Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `BOOKING_LAB_NOT_FOUND` | 404 | Lab with the specified ID does not exist |
+| `BOOKING_BUILDING_NOT_FOUND` | 404 | Building with the specified ID does not exist |
+| `BOOKING_WORKSTATION_NOT_FOUND` | 404 | Workstation with the specified ID does not exist |
+| `BOOKING_RESERVATION_NOT_FOUND` | 404 | Reservation with the specified ID does not exist |
+| `BOOKING_INVALID_TIME_RANGE` | 400 | Invalid time range (end before start, or in the past) |
+| `BOOKING_OUTSIDE_OPERATING_HOURS` | 400 | Reservation outside lab operating hours |
+| `BOOKING_LAB_CLOSED` | 400 | Lab is closed on the requested date |
+| `BOOKING_WORKSTATION_NOT_IN_LAB` | 400 | Workstation doesn't belong to the specified lab |
+| `BOOKING_WORKSTATION_INACTIVE` | 400 | Workstation is not active |
+| `BOOKING_NO_WORKSTATIONS_SELECTED` | 400 | No workstations selected for non-whole-lab booking |
+| `BOOKING_INVALID_RECURRING_PATTERN` | 400 | Invalid recurring pattern configuration |
+| `BOOKING_NO_VALID_OCCURRENCES` | 400 | Recurring pattern produces no valid dates |
+| `BOOKING_NOT_AUTHORIZED` | 403 | User not authorized for this booking action |
 
 ---
 
