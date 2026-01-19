@@ -26,6 +26,7 @@ public class CreateReservationRequest {
 
     private String description;
 
+    @Builder.Default
     private Boolean wholeLab = false;
 
     /**
