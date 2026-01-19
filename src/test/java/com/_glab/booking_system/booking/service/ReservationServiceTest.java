@@ -492,13 +492,27 @@ class ReservationServiceTest {
             when(labOperatingHoursRepository.findByLabIdAndDayOfWeek(anyInt(), anyInt()))
                     .thenReturn(Optional.empty());
             when(labClosedDayRepository.isLabClosedOnDate(anyInt(), any(), anyInt())).thenReturn(false);
-            when(labManagerRepository.findByLab(testLab)).thenReturn(new ArrayList<>());
+            when(labManagerRepository.findByLab(any(Lab.class))).thenReturn(new ArrayList<>());
 
-            // Mock saving each reservation
+            // Mock saving each reservation - store and return for findById
             when(reservationRepository.save(any(Reservation.class))).thenAnswer(invocation -> {
                 Reservation r = invocation.getArgument(0);
                 r.setId(UUID.randomUUID());
+                r.setLab(testLab);
+                r.setUser(testUser);
                 return r;
+            });
+            
+            // Mock findById for email sending
+            when(reservationRepository.findById(any(UUID.class))).thenAnswer(invocation -> {
+                Reservation r = new Reservation();
+                r.setId(invocation.getArgument(0));
+                r.setLab(testLab);
+                r.setUser(testUser);
+                r.setStartTime(tomorrow);
+                r.setEndTime(tomorrow.plusHours(2));
+                r.setStatus(ReservationStatus.PENDING);
+                return Optional.of(r);
             });
 
             // When
