@@ -40,7 +40,7 @@ public class ReservationEditProposal {
     private User editedBy;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "original_status", nullable = false, length = 20)
+    @Column(name = "original_status", nullable = false, length = 25)
     private ReservationStatus originalStatus;
 
     @Column(name = "original_start_time", nullable = false)

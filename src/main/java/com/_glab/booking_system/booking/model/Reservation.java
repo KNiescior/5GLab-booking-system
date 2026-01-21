@@ -48,7 +48,7 @@ public class Reservation {
     private String description;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 25)
     private ReservationStatus status = ReservationStatus.PENDING;
 
     @Column(name = "whole_lab")

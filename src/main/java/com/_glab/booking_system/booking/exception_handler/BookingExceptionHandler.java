@@ -150,4 +150,13 @@ public class BookingExceptionHandler {
         ErrorResponse errorResponse = new ErrorResponse(ErrorResponseCode.BOOKING_EDIT_ALREADY_RESOLVED, e.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
+
+    // ==================== General State Errors ====================
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException e) {
+        log.warn("Illegal state: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(ErrorResponseCode.BOOKING_INVALID_STATE, e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
 }
