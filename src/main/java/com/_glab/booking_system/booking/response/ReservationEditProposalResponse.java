@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com._glab.booking_system.booking.model.ReservationStatus;
+import com._glab.booking_system.booking.model.ResolutionStatus;
 import com._glab.booking_system.user.model.RoleName;
 
 import lombok.AllArgsConstructor;
@@ -83,11 +84,5 @@ public class ReservationEditProposalResponse {
         private String description;
         private Boolean wholeLab;
         private List<Integer> workstationIds;
-    }
-
-    public enum ResolutionStatus {
-        PENDING,
-        APPROVED,
-        REJECTED
     }
 }
