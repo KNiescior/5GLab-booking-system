@@ -23,7 +23,6 @@ This document tracks planned features and improvements for the 5GLab Booking Sys
   - Email: `sendReservationReminderEmail()` method in EmailService
 
 ### Calendar Integration
-- [ ] **iCal export** - Allow users to export reservations to calendar apps
 - [ ] **Calendar view API** - Endpoint optimized for calendar UI rendering
 
 ## Low Priority (Nice to Have)
