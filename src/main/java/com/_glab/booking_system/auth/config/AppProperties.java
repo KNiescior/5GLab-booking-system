@@ -8,6 +8,8 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Application-wide configuration properties.
  */
+
+//TODO: move to.env
 @Configuration
 @ConfigurationProperties(prefix = "app")
 @Getter

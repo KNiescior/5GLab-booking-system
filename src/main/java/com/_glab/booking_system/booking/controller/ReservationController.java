@@ -104,7 +104,7 @@ public class ReservationController {
                 });
         
         List<ReservationResponse> reservations = reservationService.getUserReservations(user.getId());
-        log.debug("Found {} reservations for user {}", reservations.size(), user.getEmail());
+        log.debug("Found {} reservations for user {}", reservations.size(), user.getUsername());
         return ResponseEntity.ok(reservations);
     }
 }
