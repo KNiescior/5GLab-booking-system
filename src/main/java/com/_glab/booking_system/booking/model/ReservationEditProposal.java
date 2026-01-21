@@ -40,7 +40,7 @@ public class ReservationEditProposal {
     private User editedBy;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "original_status", nullable = false, length = 20)
+    @Column(name = "original_status", nullable = false, length = 25)
     private ReservationStatus originalStatus;
 
     @Column(name = "original_start_time", nullable = false)
@@ -55,7 +55,7 @@ public class ReservationEditProposal {
     @Column(name = "original_whole_lab", nullable = false)
     private Boolean originalWholeLab = false;
 
-    @Convert(converter = WorkstationIdsConverter.class)
+    @Convert(converter = ReservationEditProposal.WorkstationIdsConverter.class)
     @Column(name = "original_workstation_ids", columnDefinition = "TEXT")
     private List<Integer> originalWorkstationIds;
 
@@ -71,7 +71,7 @@ public class ReservationEditProposal {
     @Column(name = "proposed_whole_lab", nullable = false)
     private Boolean proposedWholeLab = false;
 
-    @Convert(converter = WorkstationIdsConverter.class)
+    @Convert(converter = ReservationEditProposal.WorkstationIdsConverter.class)
     @Column(name = "proposed_workstation_ids", columnDefinition = "TEXT")
     private List<Integer> proposedWorkstationIds;
 

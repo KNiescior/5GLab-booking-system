@@ -60,5 +60,8 @@ public enum ErrorResponseCode {
     // Booking - Edit Proposals
     BOOKING_EDIT_PROPOSAL_NOT_FOUND,
     BOOKING_INVALID_EDIT,
-    BOOKING_EDIT_ALREADY_RESOLVED
+    BOOKING_EDIT_ALREADY_RESOLVED,
+
+    // Booking - State Errors
+    BOOKING_INVALID_STATE,
 }
