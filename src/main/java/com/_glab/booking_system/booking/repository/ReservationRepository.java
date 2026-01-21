@@ -77,6 +77,11 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
     List<Reservation> findByUserIdAndStatus(Integer userId, ReservationStatus status);
 
     /**
+     * Find all reservations by status.
+     */
+    List<Reservation> findByStatus(ReservationStatus status);
+
+    /**
      * Count pending reservations for a lab.
      */
     int countByLabIdAndStatus(Integer labId, ReservationStatus status);
