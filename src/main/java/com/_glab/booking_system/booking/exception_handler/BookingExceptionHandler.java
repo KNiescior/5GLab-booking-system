@@ -113,4 +113,41 @@ public class BookingExceptionHandler {
         ErrorResponse errorResponse = new ErrorResponse(ErrorResponseCode.BOOKING_NOT_AUTHORIZED, e.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
     }
+
+    @ExceptionHandler(NotLabManagerException.class)
+    public ResponseEntity<ErrorResponse> handleNotLabManager(NotLabManagerException e) {
+        log.warn("User is not a lab manager: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(ErrorResponseCode.BOOKING_NOT_LAB_MANAGER, e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+    }
+
+    @ExceptionHandler(NotReservationOwnerException.class)
+    public ResponseEntity<ErrorResponse> handleNotReservationOwner(NotReservationOwnerException e) {
+        log.warn("User is not the reservation owner: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(ErrorResponseCode.BOOKING_NOT_RESERVATION_OWNER, e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+    }
+
+    // ==================== Edit Proposal Errors ====================
+
+    @ExceptionHandler(EditProposalNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleEditProposalNotFound(EditProposalNotFoundException e) {
+        log.warn("Edit proposal not found: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(ErrorResponseCode.BOOKING_EDIT_PROPOSAL_NOT_FOUND, e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
+    @ExceptionHandler(InvalidEditException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidEdit(InvalidEditException e) {
+        log.warn("Invalid edit: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(ErrorResponseCode.BOOKING_INVALID_EDIT, e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
+    @ExceptionHandler(EditAlreadyResolvedException.class)
+    public ResponseEntity<ErrorResponse> handleEditAlreadyResolved(EditAlreadyResolvedException e) {
+        log.warn("Edit proposal already resolved: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(ErrorResponseCode.BOOKING_EDIT_ALREADY_RESOLVED, e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
 }

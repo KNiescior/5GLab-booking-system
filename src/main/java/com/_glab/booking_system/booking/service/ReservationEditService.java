@@ -44,6 +44,8 @@ public class ReservationEditService {
     private final LabOperatingHoursRepository labOperatingHoursRepository;
     private final LabClosedDayRepository labClosedDayRepository;
     private final LabManagerAuthorizationService authorizationService;
+    private final com._glab.booking_system.auth.service.EmailService emailService;
+    private final com._glab.booking_system.booking.repository.LabManagerRepository labManagerRepository;
 
     // ==================== Lab Manager/Admin Edit Operations ====================
 
@@ -885,9 +887,18 @@ public class ReservationEditService {
     private void sendEditProposalEmailToProfessor(Reservation reservation, ReservationEditProposal proposal) {
         try {
             User professor = reservation.getUser();
-            // TODO: Implement sendReservationEditProposalEmailToProfessor in EmailService
-            log.info("Edit proposal email should be sent to professor {} for reservation {}", 
-                    professor.getEmail(), reservation.getId());
+            User manager = proposal.getEditedBy();
+            String professorName = professor.getFirstName() + " " + professor.getLastName();
+            String managerName = manager.getFirstName() + " " + manager.getLastName();
+            String labName = reservation.getLab().getName();
+            
+            emailService.sendReservationEditProposalEmailToProfessor(
+                    professor.getEmail(),
+                    professorName,
+                    managerName,
+                    labName,
+                    reservation.getId()
+            );
         } catch (Exception e) {
             log.error("Failed to send edit proposal email to professor: {}", e.getMessage());
         }
@@ -895,8 +906,26 @@ public class ReservationEditService {
 
     private void sendEditProposalEmailToManager(Reservation reservation, ReservationEditProposal proposal) {
         try {
-            // TODO: Implement sendReservationEditProposalEmailToManager in EmailService
-            log.info("Edit proposal email should be sent to lab manager for reservation {}", reservation.getId());
+            User professor = reservation.getUser();
+            String professorName = professor.getFirstName() + " " + professor.getLastName();
+            String labName = reservation.getLab().getName();
+            
+            // Get lab managers for this lab
+            List<com._glab.booking_system.booking.model.LabManager> managers = 
+                    labManagerRepository.findByLab(reservation.getLab());
+            
+            for (com._glab.booking_system.booking.model.LabManager labManager : managers) {
+                User managerUser = labManager.getUser();
+                String managerName = managerUser.getFirstName() + " " + managerUser.getLastName();
+                
+                emailService.sendReservationEditProposalEmailToManager(
+                        managerUser.getEmail(),
+                        managerName,
+                        professorName,
+                        labName,
+                        reservation.getId()
+                );
+            }
         } catch (Exception e) {
             log.error("Failed to send edit proposal email to manager: {}", e.getMessage());
         }
@@ -904,8 +933,26 @@ public class ReservationEditService {
 
     private void sendReservationUpdatedEmailToManager(Reservation reservation) {
         try {
-            // TODO: Implement sendReservationUpdatedEmailToManager in EmailService
-            log.info("Reservation updated email should be sent to lab manager for reservation {}", reservation.getId());
+            User professor = reservation.getUser();
+            String professorName = professor.getFirstName() + " " + professor.getLastName();
+            String labName = reservation.getLab().getName();
+            
+            // Get lab managers for this lab
+            List<com._glab.booking_system.booking.model.LabManager> managers = 
+                    labManagerRepository.findByLab(reservation.getLab());
+            
+            for (com._glab.booking_system.booking.model.LabManager labManager : managers) {
+                User managerUser = labManager.getUser();
+                String managerName = managerUser.getFirstName() + " " + managerUser.getLastName();
+                
+                emailService.sendReservationUpdatedEmailToManager(
+                        managerUser.getEmail(),
+                        managerName,
+                        professorName,
+                        labName,
+                        reservation.getId()
+                );
+            }
         } catch (Exception e) {
             log.error("Failed to send reservation updated email to manager: {}", e.getMessage());
         }
@@ -914,9 +961,19 @@ public class ReservationEditService {
     private void sendEditApprovedByManagerEmail(Reservation reservation, ReservationEditProposal proposal) {
         try {
             User professor = reservation.getUser();
-            // TODO: Implement sendEditApprovedByManagerEmail in EmailService
-            log.info("Edit approved email should be sent to professor {} for reservation {}", 
-                    professor.getEmail(), reservation.getId());
+            String professorName = professor.getFirstName() + " " + professor.getLastName();
+            String managerName = proposal.getResolvedBy() != null 
+                    ? proposal.getResolvedBy().getFirstName() + " " + proposal.getResolvedBy().getLastName()
+                    : "Lab Manager";
+            String labName = reservation.getLab().getName();
+            
+            emailService.sendEditApprovedByManagerEmail(
+                    professor.getEmail(),
+                    professorName,
+                    managerName,
+                    labName,
+                    reservation.getId()
+            );
         } catch (Exception e) {
             log.error("Failed to send edit approved email: {}", e.getMessage());
         }
@@ -925,9 +982,20 @@ public class ReservationEditService {
     private void sendEditRejectedByManagerEmail(Reservation reservation, ReservationEditProposal proposal, String reason) {
         try {
             User professor = reservation.getUser();
-            // TODO: Implement sendEditRejectedByManagerEmail in EmailService
-            log.info("Edit rejected email should be sent to professor {} for reservation {} with reason: {}", 
-                    professor.getEmail(), reservation.getId(), reason);
+            String professorName = professor.getFirstName() + " " + professor.getLastName();
+            String managerName = proposal.getResolvedBy() != null 
+                    ? proposal.getResolvedBy().getFirstName() + " " + proposal.getResolvedBy().getLastName()
+                    : "Lab Manager";
+            String labName = reservation.getLab().getName();
+            
+            emailService.sendEditRejectedByManagerEmail(
+                    professor.getEmail(),
+                    professorName,
+                    managerName,
+                    labName,
+                    reservation.getId(),
+                    reason
+            );
         } catch (Exception e) {
             log.error("Failed to send edit rejected email: {}", e.getMessage());
         }
@@ -936,9 +1004,17 @@ public class ReservationEditService {
     private void sendEditApprovedByProfessorEmail(Reservation reservation, ReservationEditProposal proposal) {
         try {
             User manager = proposal.getEditedBy();
-            // TODO: Implement sendEditApprovedByProfessorEmail in EmailService
-            log.info("Edit approved email should be sent to lab manager {} for reservation {}", 
-                    manager.getEmail(), reservation.getId());
+            String managerName = manager.getFirstName() + " " + manager.getLastName();
+            String professorName = reservation.getUser().getFirstName() + " " + reservation.getUser().getLastName();
+            String labName = reservation.getLab().getName();
+            
+            emailService.sendEditApprovedByProfessorEmail(
+                    manager.getEmail(),
+                    managerName,
+                    professorName,
+                    labName,
+                    reservation.getId()
+            );
         } catch (Exception e) {
             log.error("Failed to send edit approved email: {}", e.getMessage());
         }
@@ -947,9 +1023,18 @@ public class ReservationEditService {
     private void sendEditRejectedByProfessorEmail(Reservation reservation, ReservationEditProposal proposal, String reason) {
         try {
             User manager = proposal.getEditedBy();
-            // TODO: Implement sendEditRejectedByProfessorEmail in EmailService
-            log.info("Edit rejected email should be sent to lab manager {} for reservation {} with reason: {}", 
-                    manager.getEmail(), reservation.getId(), reason);
+            String managerName = manager.getFirstName() + " " + manager.getLastName();
+            String professorName = reservation.getUser().getFirstName() + " " + reservation.getUser().getLastName();
+            String labName = reservation.getLab().getName();
+            
+            emailService.sendEditRejectedByProfessorEmail(
+                    manager.getEmail(),
+                    managerName,
+                    professorName,
+                    labName,
+                    reservation.getId(),
+                    reason
+            );
         } catch (Exception e) {
             log.error("Failed to send edit rejected email: {}", e.getMessage());
         }
