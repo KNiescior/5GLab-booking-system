@@ -24,18 +24,11 @@ public class EditReservationRequest {
     private String description;
 
     @Builder.Default
-    private Boolean wholeLab = Boolean.FALSE;
+    private Boolean wholeLab = false;
 
     /**
      * List of workstation IDs to reserve.
      * Required if wholeLab is false.
      */
     private List<Integer> workstationIds;
-
-    /**
-     * Custom setter to ensure wholeLab is never null.
-     */
-    public void setWholeLab(Boolean wholeLab) {
-        this.wholeLab = wholeLab != null ? wholeLab : Boolean.FALSE;
-    }
 }
