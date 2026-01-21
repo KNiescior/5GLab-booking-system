@@ -473,7 +473,8 @@ public class ReservationService {
                     startTimeFormatted,
                     endTimeFormatted,
                     isRecurring,
-                    occurrenceCount
+                    occurrenceCount,
+                    reservation.getId()
             );
 
             // Send notification to lab manager(s)
@@ -490,7 +491,8 @@ public class ReservationService {
                         startTimeFormatted,
                         endTimeFormatted,
                         isRecurring,
-                        occurrenceCount
+                        occurrenceCount,
+                        reservation.getId()
                 );
             }
 

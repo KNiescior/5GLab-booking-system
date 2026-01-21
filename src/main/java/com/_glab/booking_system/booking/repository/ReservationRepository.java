@@ -63,6 +63,14 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
     List<Reservation> findByRecurringGroupId(UUID recurringGroupId);
 
     /**
+     * Find reservations in a recurring group by status.
+     */
+    @Query("SELECT r FROM Reservation r WHERE r.recurringGroupId = :recurringGroupId AND r.status = :status ORDER BY r.startTime")
+    List<Reservation> findByRecurringGroupIdAndStatus(
+            @Param("recurringGroupId") UUID recurringGroupId,
+            @Param("status") ReservationStatus status);
+
+    /**
      * Find pending reservations for labs managed by a user.
      */
     @Query("SELECT r FROM Reservation r WHERE r.lab.id IN " +
@@ -80,6 +88,17 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
      * Find all reservations by status.
      */
     List<Reservation> findByStatus(ReservationStatus status);
+
+    /**
+     * Find all reservations by status, ordered by creation date.
+     */
+    @Query("SELECT r FROM Reservation r WHERE r.status = :status ORDER BY r.createdAt")
+    List<Reservation> findByStatusOrderByCreatedAt(@Param("status") ReservationStatus status);
+
+    /**
+     * Find reservations by lab and status.
+     */
+    List<Reservation> findByLabIdAndStatus(Integer labId, ReservationStatus status);
 
     /**
      * Count pending reservations for a lab.
