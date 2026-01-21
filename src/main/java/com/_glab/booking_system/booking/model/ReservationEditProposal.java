@@ -8,8 +8,6 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import com._glab.booking_system.user.model.User;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -89,36 +87,4 @@ public class ReservationEditProposal {
     @Enumerated(EnumType.STRING)
     @Column(name = "resolution", nullable = false, length = 20)
     private ResolutionStatus resolution = ResolutionStatus.PENDING;
-
-    /**
-     * Converter for storing List<Integer> as JSON string in the database.
-     */
-    @Converter
-    public static class WorkstationIdsConverter implements AttributeConverter<List<Integer>, String> {
-        private static final ObjectMapper objectMapper = new ObjectMapper();
-
-        @Override
-        public String convertToDatabaseColumn(List<Integer> attribute) {
-            if (attribute == null || attribute.isEmpty()) {
-                return null;
-            }
-            try {
-                return objectMapper.writeValueAsString(attribute);
-            } catch (Exception e) {
-                throw new RuntimeException("Error converting workstation IDs to JSON", e);
-            }
-        }
-
-        @Override
-        public List<Integer> convertToEntityAttribute(String dbData) {
-            if (dbData == null || dbData.isEmpty()) {
-                return List.of();
-            }
-            try {
-                return objectMapper.readValue(dbData, new TypeReference<List<Integer>>() {});
-            } catch (Exception e) {
-                throw new RuntimeException("Error converting JSON to workstation IDs", e);
-            }
-        }
-    }
 }
