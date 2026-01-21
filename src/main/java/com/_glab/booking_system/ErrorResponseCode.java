@@ -64,4 +64,5 @@ public enum ErrorResponseCode {
 
     // Booking - State Errors
     BOOKING_INVALID_STATE
+    BOOKING_EDIT_ALREADY_RESOLVED
 }
