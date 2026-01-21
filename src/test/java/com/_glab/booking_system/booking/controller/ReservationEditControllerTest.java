@@ -2,7 +2,6 @@ package com._glab.booking_system.booking.controller;
 
 import com._glab.booking_system.auth.config.TestJwtConfig;
 import com._glab.booking_system.auth.config.TestMailConfig;
-import com._glab.booking_system.config.TestJpaConfig;
 import com._glab.booking_system.auth.service.JwtService;
 import com._glab.booking_system.booking.model.*;
 import com._glab.booking_system.booking.repository.*;
@@ -29,14 +28,10 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -53,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @Testcontainers
 @Transactional
-@Import({TestJwtConfig.class, TestMailConfig.class, TestJpaConfig.class})
+@Import({TestJwtConfig.class, TestMailConfig.class})
 class ReservationEditControllerTest {
 
     @Container
@@ -107,9 +102,6 @@ class ReservationEditControllerTest {
 
     @Autowired
     private JwtService jwtService;
-
-    @PersistenceContext
-    private EntityManager entityManager;
 
     private User professor;
     private User otherProfessor;
@@ -310,7 +302,6 @@ class ReservationEditControllerTest {
             createEditProposal(reservation, labManager, OffsetDateTime.now(ZoneOffset.UTC).plusDays(3));
             reservation.setStatus(ReservationStatus.PENDING_EDIT_APPROVAL);
             reservationRepository.save(reservation);
-            entityManager.flush();
 
             OffsetDateTime newStartTime = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
                     .withHour(10).withMinute(0).withSecond(0).withNano(0);
@@ -366,7 +357,6 @@ class ReservationEditControllerTest {
             createEditProposal(reservation, labManager, newStartTime);
             reservation.setStatus(ReservationStatus.PENDING_EDIT_APPROVAL);
             reservationRepository.save(reservation);
-            entityManager.flush();
 
             mockMvc.perform(post("/api/v1/reservations/{id}/edit/approve", reservation.getId())
                             .header("Authorization", "Bearer " + professorToken))
@@ -385,7 +375,6 @@ class ReservationEditControllerTest {
             createEditProposal(reservation, labManager, OffsetDateTime.now(ZoneOffset.UTC).plusDays(2));
             reservation.setStatus(ReservationStatus.PENDING_EDIT_APPROVAL);
             reservationRepository.save(reservation);
-            entityManager.flush();
 
             // Other professor tries to approve
             mockMvc.perform(post("/api/v1/reservations/{id}/edit/approve", reservation.getId())
@@ -657,33 +646,25 @@ class ReservationEditControllerTest {
         reservation.setDescription("Test reservation");
         reservation.setStatus(ReservationStatus.PENDING);
         reservation.setWholeLab(true);
-        Reservation saved = reservationRepository.save(reservation);
-        entityManager.flush();
-        return saved;
+        return reservationRepository.save(reservation);
     }
 
     private Reservation createApprovedReservation(Lab lab, User user) {
         Reservation reservation = createPendingReservation(lab, user);
         reservation.setStatus(ReservationStatus.APPROVED);
-        Reservation saved = reservationRepository.save(reservation);
-        entityManager.flush();
-        return saved;
+        return reservationRepository.save(reservation);
     }
 
     private Reservation createPendingReservationWithGroup(Lab lab, User user, UUID groupId) {
         Reservation reservation = createPendingReservation(lab, user);
         reservation.setRecurringGroupId(groupId);
-        Reservation saved = reservationRepository.save(reservation);
-        entityManager.flush();
-        return saved;
+        return reservationRepository.save(reservation);
     }
 
     private Reservation createApprovedReservationWithGroup(Lab lab, User user, UUID groupId) {
         Reservation reservation = createApprovedReservation(lab, user);
         reservation.setRecurringGroupId(groupId);
-        Reservation saved = reservationRepository.save(reservation);
-        entityManager.flush();
-        return saved;
+        return reservationRepository.save(reservation);
     }
 
     private ReservationEditProposal createEditProposal(Reservation reservation, User editor, OffsetDateTime proposedStartTime) {
@@ -702,9 +683,8 @@ class ReservationEditControllerTest {
         proposal.setProposedWholeLab(true);
         proposal.setProposedWorkstationIds(new ArrayList<>());
         proposal.setResolution(ResolutionStatus.PENDING);
-        ReservationEditProposal saved = editProposalRepository.save(proposal);
-        entityManager.flush();
-        return saved;
+        return editProposalRepository.save(proposal);
     }
 }
+
 
