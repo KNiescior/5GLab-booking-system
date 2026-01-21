@@ -221,4 +221,10 @@ public class ReservationManagementService {
                     reservation.getId(), e.getMessage());
         }
     }
+
+    public ReservationResponse getReservation(UUID reservationId) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ReservationNotFoundException(reservationId));
+        return reservationService.toReservationResponse(reservation);
+    }
 }
