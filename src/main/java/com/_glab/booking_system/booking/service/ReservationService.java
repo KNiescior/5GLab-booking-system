@@ -504,13 +504,13 @@ public class ReservationService {
 
     // === Response Mapping ===
 
-    private ReservationResponse toReservationResponse(Reservation reservation) {
+    public ReservationResponse toReservationResponse(Reservation reservation) {
         List<Integer> workstationIds = reservationWorkstationRepository
                 .findWorkstationIdsByReservationId(reservation.getId());
         return toReservationResponse(reservation, workstationIds);
     }
 
-    private ReservationResponse toReservationResponse(Reservation reservation, List<Integer> workstationIds) {
+    public ReservationResponse toReservationResponse(Reservation reservation, List<Integer> workstationIds) {
         return ReservationResponse.builder()
                 .id(reservation.getId())
                 .labId(reservation.getLab().getId())
