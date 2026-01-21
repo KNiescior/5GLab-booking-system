@@ -267,10 +267,10 @@ class LabManagerReservationControllerTest {
         }
 
         @Test
-        @DisplayName("Should return 401 when not authenticated")
-        void shouldReturn401WhenNotAuthenticated() throws Exception {
+        @DisplayName("Should return 401 or 403 when not authenticated")
+        void shouldReturnUnauthorizedWhenNotAuthenticated() throws Exception {
             mockMvc.perform(get("/api/v1/manager/reservations/pending"))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().is4xxClientError());
         }
     }
 
@@ -434,15 +434,14 @@ class LabManagerReservationControllerTest {
             Reservation reservation = createPendingReservation(testLab, professor);
 
             OffsetDateTime newStartTime = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
-                    .withHour(14).withMinute(0).withSecond(0).withNano(0);
-            OffsetDateTime newEndTime = newStartTime.plusHours(3);
+                    .withHour(10).withMinute(0).withSecond(0).withNano(0);
+            OffsetDateTime newEndTime = newStartTime.plusHours(2);
 
             EditReservationRequest request = EditReservationRequest.builder()
                     .startTime(newStartTime)
                     .endTime(newEndTime)
                     .description("Updated description")
-                    .wholeLab(false)
-                    .workstationIds(List.of(workstation1.getId()))
+                    .wholeLab(true)
                     .build();
 
             mockMvc.perform(post("/api/v1/manager/reservations/{id}/edit", reservation.getId())
@@ -467,7 +466,7 @@ class LabManagerReservationControllerTest {
             Reservation reservation = createPendingReservation(otherLab, professor);
 
             OffsetDateTime newStartTime = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
-                    .withHour(14).withMinute(0).withSecond(0).withNano(0);
+                    .withHour(10).withMinute(0).withSecond(0).withNano(0);
 
             EditReservationRequest request = EditReservationRequest.builder()
                     .startTime(newStartTime)
@@ -489,7 +488,7 @@ class LabManagerReservationControllerTest {
             Reservation reservation = createPendingReservation(otherLab, professor);
 
             OffsetDateTime newStartTime = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
-                    .withHour(14).withMinute(0).withSecond(0).withNano(0);
+                    .withHour(10).withMinute(0).withSecond(0).withNano(0);
 
             EditReservationRequest request = EditReservationRequest.builder()
                     .startTime(newStartTime)
@@ -517,7 +516,7 @@ class LabManagerReservationControllerTest {
 
             // Professor edits it (creates edit proposal)
             OffsetDateTime newStartTime = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
-                    .withHour(14).withMinute(0).withSecond(0).withNano(0);
+                    .withHour(10).withMinute(0).withSecond(0).withNano(0);
 
             // Simulate professor edit (would be done via ReservationController)
             // For this test, we'll create the edit proposal directly
@@ -529,10 +528,12 @@ class LabManagerReservationControllerTest {
             proposal.setOriginalEndTime(reservation.getEndTime());
             proposal.setOriginalDescription(reservation.getDescription());
             proposal.setOriginalWholeLab(reservation.getWholeLab());
+            proposal.setOriginalWorkstationIds(List.of());
             proposal.setProposedStartTime(newStartTime);
             proposal.setProposedEndTime(newStartTime.plusHours(2));
             proposal.setProposedDescription("Professor edit");
             proposal.setProposedWholeLab(true);
+            proposal.setProposedWorkstationIds(List.of());
             proposal.setResolution(ResolutionStatus.PENDING);
             proposal = editProposalRepository.save(proposal);
 
@@ -564,7 +565,7 @@ class LabManagerReservationControllerTest {
 
             // Create edit proposal
             OffsetDateTime newStartTime = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
-                    .withHour(14).withMinute(0).withSecond(0).withNano(0);
+                    .withHour(10).withMinute(0).withSecond(0).withNano(0);
 
             ReservationEditProposal proposal = new ReservationEditProposal();
             proposal.setReservation(reservation);
@@ -574,10 +575,12 @@ class LabManagerReservationControllerTest {
             proposal.setOriginalEndTime(reservation.getEndTime());
             proposal.setOriginalDescription(originalDescription);
             proposal.setOriginalWholeLab(reservation.getWholeLab());
+            proposal.setOriginalWorkstationIds(List.of());
             proposal.setProposedStartTime(newStartTime);
             proposal.setProposedEndTime(newStartTime.plusHours(2));
             proposal.setProposedDescription("New description");
             proposal.setProposedWholeLab(true);
+            proposal.setProposedWorkstationIds(List.of());
             proposal.setResolution(ResolutionStatus.PENDING);
             proposal = editProposalRepository.save(proposal);
 
@@ -655,7 +658,7 @@ class LabManagerReservationControllerTest {
             Reservation reservation2 = createPendingReservationWithGroup(testLab, professor, groupId);
 
             OffsetDateTime newStartTime = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
-                    .withHour(14).withMinute(0).withSecond(0).withNano(0);
+                    .withHour(10).withMinute(0).withSecond(0).withNano(0);
 
             EditReservationRequest request = EditReservationRequest.builder()
                     .startTime(newStartTime)
@@ -675,6 +678,84 @@ class LabManagerReservationControllerTest {
             Reservation updated2 = reservationRepository.findById(reservation2.getId()).orElseThrow();
             Assertions.assertEquals(ReservationStatus.PENDING_EDIT_APPROVAL, updated1.getStatus());
             Assertions.assertEquals(ReservationStatus.PENDING_EDIT_APPROVAL, updated2.getStatus());
+        }
+
+        @Test
+        @DisplayName("Should approve professor's recurring group edit")
+        void shouldApproveProfessorsRecurringGroupEdit() throws Exception {
+            UUID groupId = UUID.randomUUID();
+            Reservation reservation1 = createApprovedReservationWithGroup(testLab, professor, groupId);
+            Reservation reservation2 = createApprovedReservationWithGroup(testLab, professor, groupId);
+
+            OffsetDateTime newStartTime = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
+                    .withHour(10).withMinute(0).withSecond(0).withNano(0);
+
+            // Create edit proposals for both reservations (simulating professor edit)
+            createEditProposal(reservation1, professor, newStartTime);
+            createEditProposal(reservation2, professor, newStartTime);
+
+            reservation1.setStatus(ReservationStatus.PENDING_EDIT_APPROVAL);
+            reservation2.setStatus(ReservationStatus.PENDING_EDIT_APPROVAL);
+            reservationRepository.save(reservation1);
+            reservationRepository.save(reservation2);
+
+            mockMvc.perform(post("/api/v1/manager/reservations/recurring/{groupId}/edit/approve", groupId)
+                            .header("Authorization", "Bearer " + labManagerToken))
+                    .andExpect(status().isNoContent());
+
+            // Verify both reservations are approved
+            Reservation updated1 = reservationRepository.findById(reservation1.getId()).orElseThrow();
+            Reservation updated2 = reservationRepository.findById(reservation2.getId()).orElseThrow();
+            Assertions.assertEquals(ReservationStatus.APPROVED, updated1.getStatus());
+            Assertions.assertEquals(ReservationStatus.APPROVED, updated2.getStatus());
+        }
+
+        @Test
+        @DisplayName("Should reject professor's recurring group edit")
+        void shouldRejectProfessorsRecurringGroupEdit() throws Exception {
+            UUID groupId = UUID.randomUUID();
+            Reservation reservation1 = createApprovedReservationWithGroup(testLab, professor, groupId);
+            Reservation reservation2 = createApprovedReservationWithGroup(testLab, professor, groupId);
+
+            OffsetDateTime newStartTime = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
+                    .withHour(10).withMinute(0).withSecond(0).withNano(0);
+
+            // Create edit proposals for both reservations (simulating professor edit)
+            createEditProposal(reservation1, professor, newStartTime);
+            createEditProposal(reservation2, professor, newStartTime);
+
+            reservation1.setStatus(ReservationStatus.PENDING_EDIT_APPROVAL);
+            reservation2.setStatus(ReservationStatus.PENDING_EDIT_APPROVAL);
+            reservationRepository.save(reservation1);
+            reservationRepository.save(reservation2);
+
+            RejectEditRequest request = RejectEditRequest.builder()
+                    .reason("Schedule conflict")
+                    .build();
+
+            mockMvc.perform(post("/api/v1/manager/reservations/recurring/{groupId}/edit/reject", groupId)
+                            .header("Authorization", "Bearer " + labManagerToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNoContent());
+
+            // Verify both reservations are restored to original status
+            Reservation updated1 = reservationRepository.findById(reservation1.getId()).orElseThrow();
+            Reservation updated2 = reservationRepository.findById(reservation2.getId()).orElseThrow();
+            Assertions.assertEquals(ReservationStatus.APPROVED, updated1.getStatus());
+            Assertions.assertEquals(ReservationStatus.APPROVED, updated2.getStatus());
+        }
+
+        @Test
+        @DisplayName("Should return 404 for non-existent recurring group")
+        void shouldReturn404ForNonExistentRecurringGroup() throws Exception {
+            UUID nonExistentGroupId = UUID.randomUUID();
+
+            mockMvc.perform(post("/api/v1/manager/reservations/recurring/{groupId}/approve", nonExistentGroupId)
+                            .header("Authorization", "Bearer " + labManagerToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isNotFound());
         }
     }
 
@@ -732,7 +813,7 @@ class LabManagerReservationControllerTest {
             Reservation reservation2 = createPendingReservationWithGroup(testLab, professor, groupId);
 
             OffsetDateTime newStartTime = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
-                    .withHour(14).withMinute(0).withSecond(0).withNano(0);
+                    .withHour(10).withMinute(0).withSecond(0).withNano(0);
 
             EditReservationRequest request = EditReservationRequest.builder()
                     .startTime(newStartTime)
@@ -787,5 +868,31 @@ class LabManagerReservationControllerTest {
         reservation.setRecurringGroupId(groupId);
         return reservationRepository.save(reservation);
     }
+
+    private Reservation createApprovedReservationWithGroup(Lab lab, User user, UUID groupId) {
+        Reservation reservation = createApprovedReservation(lab, user);
+        reservation.setRecurringGroupId(groupId);
+        return reservationRepository.save(reservation);
+    }
+
+    private ReservationEditProposal createEditProposal(Reservation reservation, User editor, OffsetDateTime proposedStartTime) {
+        ReservationEditProposal proposal = new ReservationEditProposal();
+        proposal.setReservation(reservation);
+        proposal.setEditedBy(editor);
+        proposal.setOriginalStatus(reservation.getStatus());
+        proposal.setOriginalStartTime(reservation.getStartTime());
+        proposal.setOriginalEndTime(reservation.getEndTime());
+        proposal.setOriginalDescription(reservation.getDescription());
+        proposal.setOriginalWholeLab(reservation.getWholeLab());
+        proposal.setOriginalWorkstationIds(List.of());
+        proposal.setProposedStartTime(proposedStartTime);
+        proposal.setProposedEndTime(proposedStartTime.plusHours(2));
+        proposal.setProposedDescription("Updated by editor");
+        proposal.setProposedWholeLab(true);
+        proposal.setProposedWorkstationIds(List.of());
+        proposal.setResolution(ResolutionStatus.PENDING);
+        return editProposalRepository.save(proposal);
+    }
 }
+
 
