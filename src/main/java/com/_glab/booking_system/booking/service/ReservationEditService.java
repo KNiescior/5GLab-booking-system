@@ -624,18 +624,18 @@ public class ReservationEditService {
         proposal.setEditedBy(editor);
         proposal.setOriginalStatus(originalStatus);
         
-        // Store original values
+        // Store original values (ensure non-null for nullable=false columns)
         proposal.setOriginalStartTime(reservation.getStartTime());
         proposal.setOriginalEndTime(reservation.getEndTime());
         proposal.setOriginalDescription(reservation.getDescription());
-        proposal.setOriginalWholeLab(reservation.getWholeLab());
-        proposal.setOriginalWorkstationIds(currentWorkstationIds);
+        proposal.setOriginalWholeLab(reservation.getWholeLab() != null ? reservation.getWholeLab() : false);
+        proposal.setOriginalWorkstationIds(currentWorkstationIds != null ? currentWorkstationIds : List.of());
         
-        // Store proposed values
+        // Store proposed values (ensure non-null for nullable=false columns)
         proposal.setProposedStartTime(request.getStartTime());
         proposal.setProposedEndTime(request.getEndTime());
         proposal.setProposedDescription(request.getDescription());
-        proposal.setProposedWholeLab(request.getWholeLab());
+        proposal.setProposedWholeLab(request.getWholeLab() != null ? request.getWholeLab() : false);
         proposal.setProposedWorkstationIds(request.getWorkstationIds() != null ? request.getWorkstationIds() : List.of());
         
         proposal.setResolution(ResolutionStatus.PENDING);
@@ -654,11 +654,12 @@ public class ReservationEditService {
         reservation.setStartTime(proposal.getProposedStartTime());
         reservation.setEndTime(proposal.getProposedEndTime());
         reservation.setDescription(proposal.getProposedDescription());
-        reservation.setWholeLab(proposal.getProposedWholeLab());
+        Boolean proposedWholeLab = proposal.getProposedWholeLab() != null ? proposal.getProposedWholeLab() : false;
+        reservation.setWholeLab(proposedWholeLab);
 
         // Update workstation assignments
         reservationWorkstationRepository.deleteByReservationId(reservation.getId());
-        if (!proposal.getProposedWholeLab() && proposal.getProposedWorkstationIds() != null 
+        if (!proposedWholeLab && proposal.getProposedWorkstationIds() != null 
                 && !proposal.getProposedWorkstationIds().isEmpty()) {
             for (Integer workstationId : proposal.getProposedWorkstationIds()) {
                 Workstation workstation = workstationRepository.findById(workstationId)
@@ -699,11 +700,12 @@ public class ReservationEditService {
         reservation.setStartTime(proposal.getOriginalStartTime());
         reservation.setEndTime(proposal.getOriginalEndTime());
         reservation.setDescription(proposal.getOriginalDescription());
-        reservation.setWholeLab(proposal.getOriginalWholeLab());
+        Boolean originalWholeLab = proposal.getOriginalWholeLab() != null ? proposal.getOriginalWholeLab() : false;
+        reservation.setWholeLab(originalWholeLab);
 
         // Restore workstation assignments
         reservationWorkstationRepository.deleteByReservationId(reservation.getId());
-        if (!proposal.getOriginalWholeLab() && proposal.getOriginalWorkstationIds() != null 
+        if (!originalWholeLab && proposal.getOriginalWorkstationIds() != null 
                 && !proposal.getOriginalWorkstationIds().isEmpty()) {
             for (Integer workstationId : proposal.getOriginalWorkstationIds()) {
                 Workstation workstation = workstationRepository.findById(workstationId)
@@ -734,11 +736,12 @@ public class ReservationEditService {
         reservation.setStartTime(request.getStartTime());
         reservation.setEndTime(request.getEndTime());
         reservation.setDescription(request.getDescription());
-        reservation.setWholeLab(request.getWholeLab());
+        Boolean wholeLab = request.getWholeLab() != null ? request.getWholeLab() : false;
+        reservation.setWholeLab(wholeLab);
 
         // Update workstation assignments
         reservationWorkstationRepository.deleteByReservationId(reservation.getId());
-        if (!request.getWholeLab() && request.getWorkstationIds() != null 
+        if (!wholeLab && request.getWorkstationIds() != null 
                 && !request.getWorkstationIds().isEmpty()) {
             for (Integer workstationId : request.getWorkstationIds()) {
                 Workstation workstation = workstationRepository.findById(workstationId)
