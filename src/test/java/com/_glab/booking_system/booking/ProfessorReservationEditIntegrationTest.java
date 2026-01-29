@@ -89,6 +89,9 @@ class ProfessorReservationEditIntegrationTest {
     private SpecialOperatingHoursRepository specialOperatingHoursRepository;
 
     @Autowired
+    private LabRepository labRepository;
+
+    @Autowired
     private WorkstationRepository workstationRepository;
 
     @Autowired
@@ -122,6 +125,7 @@ class ProfessorReservationEditIntegrationTest {
     @BeforeEach
     void setUp() {
         // Clean up in correct order (handle foreign key constraints)
+        // Clean up
         editProposalRepository.deleteAll();
         reservationWorkstationRepository.deleteAll();
         reservationRepository.deleteAll();
@@ -133,6 +137,7 @@ class ProfessorReservationEditIntegrationTest {
         labRepository.deleteAll();
         buildingClosedDayRepository.deleteAll();
         buildingOperatingHoursRepository.deleteAll();
+        labRepository.deleteAll();
         buildingRepository.deleteAll();
         userRepository.deleteAll();
         roleRepository.deleteAll();
