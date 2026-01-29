@@ -73,7 +73,22 @@ class LabManagerReservationIntegrationTest {
     private BuildingRepository buildingRepository;
 
     @Autowired
+    private BuildingOperatingHoursRepository buildingOperatingHoursRepository;
+
+    @Autowired
+    private BuildingClosedDayRepository buildingClosedDayRepository;
+
+    @Autowired
     private LabRepository labRepository;
+
+    @Autowired
+    private LabOperatingHoursRepository labOperatingHoursRepository;
+
+    @Autowired
+    private LabClosedDayRepository labClosedDayRepository;
+
+    @Autowired
+    private SpecialOperatingHoursRepository specialOperatingHoursRepository;
 
     @Autowired
     private WorkstationRepository workstationRepository;
@@ -112,13 +127,18 @@ class LabManagerReservationIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Clean up in correct order
+        // Clean up in correct order (handle foreign key constraints)
         editProposalRepository.deleteAll();
         reservationWorkstationRepository.deleteAll();
         reservationRepository.deleteAll();
         labManagerRepository.deleteAll();
         workstationRepository.deleteAll();
+        specialOperatingHoursRepository.deleteAll();
+        labClosedDayRepository.deleteAll();
+        labOperatingHoursRepository.deleteAll();
         labRepository.deleteAll();
+        buildingClosedDayRepository.deleteAll();
+        buildingOperatingHoursRepository.deleteAll();
         buildingRepository.deleteAll();
         userRepository.deleteAll();
         roleRepository.deleteAll();

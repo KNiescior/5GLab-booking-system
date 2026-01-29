@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -99,12 +100,12 @@ class AvailabilityServiceTest {
         testUser.setLastName("Professor");
         testUser.setRole(professorRole);
 
-        // Default stubs for building operating hours, building closed days, and special operating hours
-        when(buildingOperatingHoursRepository.findByBuildingId(anyInt())).thenReturn(List.of());
-        when(buildingOperatingHoursRepository.findByBuildingIdAndDayOfWeek(anyInt(), anyInt())).thenReturn(Optional.empty());
-        when(buildingClosedDayRepository.findByBuildingId(anyInt())).thenReturn(List.of());
-        when(specialOperatingHoursRepository.findByLabIdAndSpecificDate(anyInt(), any())).thenReturn(Optional.empty());
-        when(specialOperatingHoursRepository.findByBuildingIdAndSpecificDate(anyInt(), any())).thenReturn(Optional.empty());
+        // Lenient default stubs for building/special hours (used only in some tests)
+        lenient().when(buildingOperatingHoursRepository.findByBuildingId(anyInt())).thenReturn(List.of());
+        lenient().when(buildingOperatingHoursRepository.findByBuildingIdAndDayOfWeek(anyInt(), anyInt())).thenReturn(Optional.empty());
+        lenient().when(buildingClosedDayRepository.findByBuildingId(anyInt())).thenReturn(List.of());
+        lenient().when(specialOperatingHoursRepository.findByLabIdAndSpecificDate(anyInt(), any())).thenReturn(Optional.empty());
+        lenient().when(specialOperatingHoursRepository.findByBuildingIdAndSpecificDate(anyInt(), any())).thenReturn(Optional.empty());
     }
 
     @Nested
@@ -204,10 +205,12 @@ class AvailabilityServiceTest {
             // When
             LabAvailabilityResponse response = availabilityService.getWeeklyAvailability(1, null);
 
-            // Then
-            assertThat(response.getOperatingHours()).hasSize(1);
-            OperatingHoursResponse mondayResponse = response.getOperatingHours().get(0);
-            assertThat(mondayResponse.getDayOfWeek()).isEqualTo(1);
+            // Then - getOperatingHours returns 7 days (0-6); Monday is day 1
+            assertThat(response.getOperatingHours()).hasSize(7);
+            OperatingHoursResponse mondayResponse = response.getOperatingHours().stream()
+                    .filter(h -> h.getDayOfWeek() == 1)
+                    .findFirst()
+                    .orElseThrow();
             assertThat(mondayResponse.getOpen()).isEqualTo(LocalTime.of(9, 0));
             assertThat(mondayResponse.getClose()).isEqualTo(LocalTime.of(18, 0));
             assertThat(mondayResponse.getClosed()).isFalse();

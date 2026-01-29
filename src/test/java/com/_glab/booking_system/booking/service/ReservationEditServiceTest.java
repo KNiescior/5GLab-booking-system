@@ -2,7 +2,9 @@ package com._glab.booking_system.booking.service;
 
 import com._glab.booking_system.auth.service.EmailService;
 import com._glab.booking_system.booking.exception.BookingNotAuthorizedException;
+import com._glab.booking_system.booking.exception.EditAlreadyResolvedException;
 import com._glab.booking_system.booking.exception.EditProposalNotFoundException;
+import com._glab.booking_system.booking.exception.InvalidEditException;
 import com._glab.booking_system.booking.exception.ReservationNotFoundException;
 import com._glab.booking_system.booking.model.*;
 import com._glab.booking_system.booking.repository.*;
@@ -237,7 +239,7 @@ class ReservationEditServiceTest {
                     .thenReturn(Optional.of(editProposal));
 
             assertThatThrownBy(() -> editService.editReservationByManager(reservationId, validEditRequest, labManagerUser))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(EditAlreadyResolvedException.class)
                     .hasMessageContaining("pending edit proposal");
         }
     }
@@ -430,7 +432,7 @@ class ReservationEditServiceTest {
             when(authorizationService.isReservationOwner(professorUser, rejectedReservation)).thenReturn(true);
 
             assertThatThrownBy(() -> editService.editReservationByProfessor(rejectedReservation.getId(), validEditRequest, professorUser))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(InvalidEditException.class)
                     .hasMessageContaining("PENDING or APPROVED");
         }
     }
@@ -481,7 +483,7 @@ class ReservationEditServiceTest {
             when(authorizationService.isReservationOwner(professorUser, pendingReservation)).thenReturn(true);
 
             assertThatThrownBy(() -> editService.approveEditByProfessor(reservationId, professorUser))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(InvalidEditException.class)
                     .hasMessageContaining("not created by a lab manager");
         }
     }
