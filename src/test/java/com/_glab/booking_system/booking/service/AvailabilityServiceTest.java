@@ -40,7 +40,13 @@ class AvailabilityServiceTest {
     @Mock
     private LabOperatingHoursRepository operatingHoursRepository;
     @Mock
+    private BuildingOperatingHoursRepository buildingOperatingHoursRepository;
+    @Mock
     private LabClosedDayRepository closedDayRepository;
+    @Mock
+    private BuildingClosedDayRepository buildingClosedDayRepository;
+    @Mock
+    private SpecialOperatingHoursRepository specialOperatingHoursRepository;
     @Mock
     private ReservationRepository reservationRepository;
     @Mock
@@ -59,7 +65,10 @@ class AvailabilityServiceTest {
         availabilityService = new AvailabilityService(
                 labRepository,
                 operatingHoursRepository,
+                buildingOperatingHoursRepository,
                 closedDayRepository,
+                buildingClosedDayRepository,
+                specialOperatingHoursRepository,
                 reservationRepository,
                 reservationWorkstationRepository,
                 workstationRepository
@@ -89,6 +98,13 @@ class AvailabilityServiceTest {
         testUser.setFirstName("Test");
         testUser.setLastName("Professor");
         testUser.setRole(professorRole);
+
+        // Default stubs for building operating hours, building closed days, and special operating hours
+        when(buildingOperatingHoursRepository.findByBuildingId(anyInt())).thenReturn(List.of());
+        when(buildingOperatingHoursRepository.findByBuildingIdAndDayOfWeek(anyInt(), anyInt())).thenReturn(Optional.empty());
+        when(buildingClosedDayRepository.findByBuildingId(anyInt())).thenReturn(List.of());
+        when(specialOperatingHoursRepository.findByLabIdAndSpecificDate(anyInt(), any())).thenReturn(Optional.empty());
+        when(specialOperatingHoursRepository.findByBuildingIdAndSpecificDate(anyInt(), any())).thenReturn(Optional.empty());
     }
 
     @Nested

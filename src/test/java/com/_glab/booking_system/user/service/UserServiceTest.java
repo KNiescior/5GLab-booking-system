@@ -1,8 +1,13 @@
 package com._glab.booking_system.user.service;
 
 import com._glab.booking_system.auth.model.TokenPurpose;
+import com._glab.booking_system.auth.repository.EmailOtpRepository;
+import com._glab.booking_system.auth.repository.PasswordSetupTokenRepository;
 import com._glab.booking_system.auth.service.EmailService;
 import com._glab.booking_system.auth.service.PasswordSetupTokenService;
+import com._glab.booking_system.booking.repository.LabManagerRepository;
+import com._glab.booking_system.booking.repository.ReservationEditProposalRepository;
+import com._glab.booking_system.booking.repository.ReservationRepository;
 import com._glab.booking_system.user.exception.InvalidRoleException;
 import com._glab.booking_system.user.exception.UserAlreadyExistsException;
 import com._glab.booking_system.user.exception.UsernameAlreadyExistsException;
@@ -22,6 +27,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import com._glab.booking_system.auth.repository.RefreshTokenRepository;
 
 import java.util.Optional;
 
@@ -48,6 +55,24 @@ class UserServiceTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Mock
+    private ReservationRepository reservationRepository;
+
+    @Mock
+    private ReservationEditProposalRepository reservationEditProposalRepository;
+
+    @Mock
+    private LabManagerRepository labManagerRepository;
+
+    @Mock
+    private EmailOtpRepository emailOtpRepository;
+
+    @Mock
+    private PasswordSetupTokenRepository passwordSetupTokenRepository;
+
     private UserService userService;
 
     private Role professorRole;
@@ -55,7 +80,18 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, roleRepository, passwordSetupTokenService, emailService);
+        userService = new UserService(
+                userRepository,
+                roleRepository,
+                passwordSetupTokenService,
+                emailService,
+                refreshTokenRepository,
+                reservationRepository,
+                reservationEditProposalRepository,
+                labManagerRepository,
+                emailOtpRepository,
+                passwordSetupTokenRepository
+        );
 
         professorRole = new Role();
         professorRole.setId(1);
