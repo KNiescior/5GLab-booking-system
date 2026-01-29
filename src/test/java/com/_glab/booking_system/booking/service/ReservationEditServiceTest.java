@@ -5,6 +5,7 @@ import com._glab.booking_system.booking.exception.BookingNotAuthorizedException;
 import com._glab.booking_system.booking.exception.EditAlreadyResolvedException;
 import com._glab.booking_system.booking.exception.EditProposalNotFoundException;
 import com._glab.booking_system.booking.exception.InvalidEditException;
+import com._glab.booking_system.booking.exception.EditProposalNotFoundException;
 import com._glab.booking_system.booking.exception.ReservationNotFoundException;
 import com._glab.booking_system.booking.model.*;
 import com._glab.booking_system.booking.repository.*;
@@ -240,6 +241,7 @@ class ReservationEditServiceTest {
 
             assertThatThrownBy(() -> editService.editReservationByManager(reservationId, validEditRequest, labManagerUser))
                     .isInstanceOf(EditAlreadyResolvedException.class)
+                    .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("pending edit proposal");
         }
     }
@@ -433,6 +435,7 @@ class ReservationEditServiceTest {
 
             assertThatThrownBy(() -> editService.editReservationByProfessor(rejectedReservation.getId(), validEditRequest, professorUser))
                     .isInstanceOf(InvalidEditException.class)
+                    .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("PENDING or APPROVED");
         }
     }
@@ -484,6 +487,7 @@ class ReservationEditServiceTest {
 
             assertThatThrownBy(() -> editService.approveEditByProfessor(reservationId, professorUser))
                     .isInstanceOf(InvalidEditException.class)
+                    .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("not created by a lab manager");
         }
     }
