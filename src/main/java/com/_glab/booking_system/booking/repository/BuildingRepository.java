@@ -11,4 +11,8 @@ public interface BuildingRepository extends JpaRepository<Building, Integer> {
     Optional<Building> findByName(String name);
 
     List<Building> findAll();
+
+    List<Building> findAllByActiveTrue();
+
+    Optional<Building> findByIdAndActiveTrue(Integer id);
 }

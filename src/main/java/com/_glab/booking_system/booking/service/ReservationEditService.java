@@ -10,7 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com._glab.booking_system.booking.exception.BookingNotAuthorizedException;
+import com._glab.booking_system.booking.exception.EditAlreadyResolvedException;
 import com._glab.booking_system.booking.exception.EditProposalNotFoundException;
+import com._glab.booking_system.booking.exception.InvalidEditException;
 import com._glab.booking_system.booking.exception.ReservationNotFoundException;
 import com._glab.booking_system.booking.model.Lab;
 import com._glab.booking_system.booking.model.Reservation;
@@ -77,7 +79,7 @@ public class ReservationEditService {
                 .findByReservationIdAndResolution(reservationId, ResolutionStatus.PENDING);
         if (existingProposal.isPresent()) {
             log.warn("Reservation {} already has a pending edit proposal", reservationId);
-            throw new IllegalStateException("Reservation already has a pending edit proposal");
+            throw new EditAlreadyResolvedException("Reservation already has a pending edit proposal");
         }
 
         // Create edit proposal
@@ -146,7 +148,7 @@ public class ReservationEditService {
         // Verify the edit was made by professor
         if (!authorizationService.isReservationOwner(proposal.getEditedBy(), reservation)) {
             log.warn("Edit proposal {} was not created by the reservation owner", proposal.getId());
-            throw new IllegalStateException("This edit proposal was not created by the reservation owner");
+            throw new InvalidEditException("This edit proposal was not created by the reservation owner");
         }
 
         // Restore original values
@@ -175,7 +177,7 @@ public class ReservationEditService {
         // Verify this is part of a recurring group
         if (occurrence.getRecurringGroupId() == null) {
             log.warn("Reservation {} is not part of a recurring group", occurrenceId);
-            throw new IllegalStateException("This reservation is not part of a recurring group. Use editReservationByManager instead.");
+            throw new InvalidEditException("This reservation is not part of a recurring group. Use editReservationByManager instead.");
         }
 
         // Check authorization
@@ -192,7 +194,7 @@ public class ReservationEditService {
                 .findByReservationIdAndResolution(occurrenceId, ResolutionStatus.PENDING);
         if (existingProposal.isPresent()) {
             log.warn("Occurrence {} already has a pending edit proposal", occurrenceId);
-            throw new IllegalStateException("This occurrence already has a pending edit proposal");
+            throw new EditAlreadyResolvedException("This occurrence already has a pending edit proposal");
         }
 
         // Create edit proposal for this single occurrence
@@ -374,7 +376,7 @@ public class ReservationEditService {
                     .findByReservationIdAndResolution(reservationId, ResolutionStatus.PENDING);
             if (existingProposal.isPresent()) {
                 log.warn("Reservation {} already has a pending edit proposal", reservationId);
-                throw new IllegalStateException("Reservation already has a pending edit proposal");
+                throw new EditAlreadyResolvedException("Reservation already has a pending edit proposal");
             }
 
             ReservationEditProposal proposal = createEditProposal(reservation, request, professor, ReservationStatus.APPROVED);
@@ -389,7 +391,7 @@ public class ReservationEditService {
             sendEditProposalEmailToManager(reservation, proposal);
         } else {
             log.warn("Cannot edit reservation {} with status {}", reservationId, reservation.getStatus());
-            throw new IllegalStateException("Only PENDING or APPROVED reservations can be edited");
+            throw new InvalidEditException("Only PENDING or APPROVED reservations can be edited");
         }
     }
 
@@ -413,7 +415,7 @@ public class ReservationEditService {
         // Verify the edit was made by a lab manager (not by the professor)
         if (authorizationService.isReservationOwner(proposal.getEditedBy(), reservation)) {
             log.warn("Edit proposal {} was created by the reservation owner, not a lab manager", proposal.getId());
-            throw new IllegalStateException("This edit proposal was not created by a lab manager");
+            throw new InvalidEditException("This edit proposal was not created by a lab manager");
         }
 
         // Apply the edit
@@ -445,7 +447,7 @@ public class ReservationEditService {
         // Verify the edit was made by a lab manager
         if (authorizationService.isReservationOwner(proposal.getEditedBy(), reservation)) {
             log.warn("Edit proposal {} was created by the reservation owner, not a lab manager", proposal.getId());
-            throw new IllegalStateException("This edit proposal was not created by a lab manager");
+            throw new InvalidEditException("This edit proposal was not created by a lab manager");
         }
 
         // Restore original values
@@ -648,6 +650,10 @@ public class ReservationEditService {
      */
     @Transactional
     private void applyEditProposal(ReservationEditProposal proposal, User approver) {
+        if (proposal.getResolution() != ResolutionStatus.PENDING) {
+            throw new EditAlreadyResolvedException(proposal.getId());
+        }
+
         Reservation reservation = proposal.getReservation();
 
         // Update reservation with proposed values
@@ -668,15 +674,8 @@ public class ReservationEditService {
             }
         }
 
-        // Set status based on original status
-        // If original was APPROVED and professor edited, it goes back to APPROVED
-        // If original was PENDING and lab manager edited, it becomes APPROVED
-        if (proposal.getOriginalStatus() == ReservationStatus.APPROVED) {
-            reservation.setStatus(ReservationStatus.APPROVED);
-        } else {
-            reservation.setStatus(ReservationStatus.APPROVED);
-        }
-
+        // After approval, reservation is always APPROVED (whether originally PENDING or APPROVED).
+        reservation.setStatus(ReservationStatus.APPROVED);
         reservationRepository.save(reservation);
 
         // Mark proposal as approved
@@ -693,6 +692,10 @@ public class ReservationEditService {
      */
     @Transactional
     private void restoreOriginalValues(ReservationEditProposal proposal, User rejector, String reason) {
+        if (proposal.getResolution() != ResolutionStatus.PENDING) {
+            throw new EditAlreadyResolvedException(proposal.getId());
+        }
+
         Reservation reservation = proposal.getReservation();
 
         // Restore original values

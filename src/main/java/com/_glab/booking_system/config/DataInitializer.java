@@ -93,4 +93,35 @@ public class DataInitializer {
             }
         };
     }
+
+    /**
+     * Ensures the anonymous system user exists (for placeholder when users are hard-deleted).
+     * Runs on all profiles.
+     */
+    @Bean
+    CommandLineRunner initAnonymousUser(UserRepository userRepository, RoleRepository roleRepository) {
+        return args -> {
+            if (userRepository.findByIsAnonymousTrue().isPresent()) {
+                return;
+            }
+            Role professorRole = roleRepository.findByName(RoleName.PROFESSOR)
+                    .orElseGet(() -> {
+                        Role r = new Role();
+                        r.setName(RoleName.PROFESSOR);
+                        r.setDescription("PROFESSOR role");
+                        return roleRepository.save(r);
+                    });
+            User anonymous = new User();
+            anonymous.setEmail("anonymous@system.local");
+            anonymous.setUsername("__anonymous__");
+            anonymous.setFirstName("Deleted");
+            anonymous.setLastName("User");
+            anonymous.setRole(professorRole);
+            anonymous.setEnabled(false);
+            anonymous.setIsAnonymous(true);
+            userRepository.save(anonymous);
+            log.info("Created anonymous system user (placeholder for deleted accounts)");
+        };
+    }
 }
+

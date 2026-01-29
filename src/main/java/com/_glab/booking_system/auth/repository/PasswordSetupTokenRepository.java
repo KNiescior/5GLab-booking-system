@@ -14,6 +14,8 @@ import java.util.UUID;
 
 public interface PasswordSetupTokenRepository extends JpaRepository<PasswordSetupToken, UUID> {
 
+	List<PasswordSetupToken> findByUser(User user);
+
 	/**
 	 * Find token by its hash (used during verification).
 	 */

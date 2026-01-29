@@ -7,10 +7,13 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface EmailOtpRepository extends JpaRepository<EmailOtp, UUID> {
+
+    List<EmailOtp> findByUser(User user);
 
     /**
      * Find a valid (unused, not expired) OTP for the given user and code hash.

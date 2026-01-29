@@ -16,4 +16,9 @@ public class ApproveEditRequest {
      */
     @Builder.Default
     private Boolean approve = true;
+
+    /**
+     * Optional reason (e.g. for approval note or rejection reason).
+     */
+    private String reason;
 }

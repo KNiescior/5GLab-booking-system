@@ -12,17 +12,23 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com._glab.booking_system.booking.model.BuildingClosedDay;
+import com._glab.booking_system.booking.model.BuildingOperatingHours;
 import com._glab.booking_system.booking.model.Lab;
 import com._glab.booking_system.booking.model.LabClosedDay;
 import com._glab.booking_system.booking.model.LabOperatingHours;
 import com._glab.booking_system.booking.model.Reservation;
 import com._glab.booking_system.booking.model.ReservationStatus;
+import com._glab.booking_system.booking.model.SpecialOperatingHours;
 import com._glab.booking_system.booking.model.Workstation;
+import com._glab.booking_system.booking.repository.BuildingClosedDayRepository;
+import com._glab.booking_system.booking.repository.BuildingOperatingHoursRepository;
 import com._glab.booking_system.booking.repository.LabClosedDayRepository;
 import com._glab.booking_system.booking.repository.LabOperatingHoursRepository;
 import com._glab.booking_system.booking.repository.LabRepository;
 import com._glab.booking_system.booking.repository.ReservationRepository;
 import com._glab.booking_system.booking.repository.ReservationWorkstationRepository;
+import com._glab.booking_system.booking.repository.SpecialOperatingHoursRepository;
 import com._glab.booking_system.booking.repository.WorkstationRepository;
 import com._glab.booking_system.booking.response.ClosedDayResponse;
 import com._glab.booking_system.booking.response.CurrentAvailabilityResponse;
@@ -42,7 +48,10 @@ public class AvailabilityService {
 
     private final LabRepository labRepository;
     private final LabOperatingHoursRepository operatingHoursRepository;
+    private final BuildingOperatingHoursRepository buildingOperatingHoursRepository;
     private final LabClosedDayRepository closedDayRepository;
+    private final BuildingClosedDayRepository buildingClosedDayRepository;
+    private final SpecialOperatingHoursRepository specialOperatingHoursRepository;
     private final ReservationRepository reservationRepository;
     private final ReservationWorkstationRepository reservationWorkstationRepository;
     private final WorkstationRepository workstationRepository;
@@ -168,62 +177,103 @@ public class AvailabilityService {
     // === Private helper methods ===
 
     private List<OperatingHoursResponse> getOperatingHours(Integer labId, Lab lab) {
-        List<LabOperatingHours> hours = operatingHoursRepository.findByLabId(labId);
-        
-        // If no specific hours defined, use lab defaults for all days
-        if (hours.isEmpty()) {
-            List<OperatingHoursResponse> defaultHours = new ArrayList<>();
-            for (int day = 0; day <= 6; day++) {
-                boolean isSunday = (day == 0);
-                defaultHours.add(OperatingHoursResponse.builder()
-                        .dayOfWeek(day)
-                        .open(isSunday ? null : lab.getDefaultOpenTime())
-                        .close(isSunday ? null : lab.getDefaultCloseTime())
-                        .closed(isSunday)
-                        .build());
-            }
-            return defaultHours;
-        }
+        List<LabOperatingHours> labHours = operatingHoursRepository.findByLabId(labId);
+        Integer buildingId = lab.getBuilding() != null ? lab.getBuilding().getId() : null;
+        List<BuildingOperatingHours> buildingHours = buildingId != null
+                ? buildingOperatingHoursRepository.findByBuildingId(buildingId)
+                : List.of();
 
-        return hours.stream()
-                .map(h -> OperatingHoursResponse.builder()
-                        .dayOfWeek(h.getDayOfWeek())
-                        .open(h.getOpenTime())
-                        .close(h.getCloseTime())
-                        .closed(h.getIsClosed())
-                        .build())
-                .collect(Collectors.toList());
+        List<OperatingHoursResponse> result = new ArrayList<>();
+        for (int day = 0; day <= 6; day++) {
+            int d = day;
+            LabOperatingHours labEntry = labHours.stream().filter(h -> h.getDayOfWeek() == d).findFirst().orElse(null);
+            if (labEntry != null) {
+                result.add(OperatingHoursResponse.builder()
+                        .dayOfWeek(day)
+                        .open(labEntry.getOpenTime())
+                        .close(labEntry.getCloseTime())
+                        .closed(labEntry.getIsClosed())
+                        .build());
+                continue;
+            }
+            BuildingOperatingHours buildingEntry = buildingHours.stream().filter(h -> h.getDayOfWeek() == d).findFirst().orElse(null);
+            if (buildingEntry != null) {
+                result.add(OperatingHoursResponse.builder()
+                        .dayOfWeek(day)
+                        .open(buildingEntry.getOpenTime())
+                        .close(buildingEntry.getCloseTime())
+                        .closed(buildingEntry.getIsClosed())
+                        .build());
+                continue;
+            }
+            boolean isSunday = (day == 0);
+            result.add(OperatingHoursResponse.builder()
+                    .dayOfWeek(day)
+                    .open(isSunday ? null : lab.getDefaultOpenTime())
+                    .close(isSunday ? null : lab.getDefaultCloseTime())
+                    .closed(isSunday)
+                    .build());
+        }
+        return result;
     }
 
     private List<ClosedDayResponse> getClosedDaysInRange(Integer labId, LocalDate start, LocalDate end) {
+        List<ClosedDayResponse> result = new ArrayList<>();
+
+        // University + lab closed days (LabClosedDay: lab=null or lab=labId)
         List<LabClosedDay> specificClosures = closedDayRepository.findSpecificClosuresInRange(labId, start, end);
         List<LabClosedDay> recurringClosures = closedDayRepository.findRecurringClosures(labId);
 
-        List<ClosedDayResponse> result = new ArrayList<>();
-
-        // Add specific closures
         for (LabClosedDay closure : specificClosures) {
-            result.add(ClosedDayResponse.builder()
-                    .date(closure.getSpecificDate())
-                    .reason(closure.getReason())
-                    .build());
+            if (closure.getSpecificDate() != null) {
+                result.add(ClosedDayResponse.builder()
+                        .date(closure.getSpecificDate())
+                        .reason(closure.getReason())
+                        .build());
+            }
         }
 
-        // Add recurring closures for each matching day in the range
         for (LabClosedDay recurring : recurringClosures) {
             LocalDate current = start;
             while (!current.isAfter(end)) {
-                // Java DayOfWeek: MONDAY=1, SUNDAY=7. Our DB: SUNDAY=0, MONDAY=1
                 int javaDayValue = current.getDayOfWeek().getValue();
                 int ourDayValue = javaDayValue == 7 ? 0 : javaDayValue;
-                
-                if (ourDayValue == recurring.getRecurringDayOfWeek()) {
+                if (recurring.getRecurringDayOfWeek() != null && ourDayValue == recurring.getRecurringDayOfWeek()) {
                     result.add(ClosedDayResponse.builder()
                             .date(current)
                             .reason(recurring.getReason())
                             .build());
                 }
                 current = current.plusDays(1);
+            }
+        }
+
+        // Building closed days (lab's building)
+        Lab lab = labRepository.findById(labId).orElse(null);
+        if (lab != null && lab.getBuilding() != null) {
+            Integer buildingId = lab.getBuilding().getId();
+            List<BuildingClosedDay> buildingClosures = buildingClosedDayRepository.findByBuildingId(buildingId);
+            for (BuildingClosedDay b : buildingClosures) {
+                if (b.getSpecificDate() != null && !b.getSpecificDate().isBefore(start) && !b.getSpecificDate().isAfter(end)) {
+                    result.add(ClosedDayResponse.builder()
+                            .date(b.getSpecificDate())
+                            .reason(b.getReason())
+                            .build());
+                }
+                if (b.getRecurringDayOfWeek() != null) {
+                    LocalDate current = start;
+                    while (!current.isAfter(end)) {
+                        int javaDayValue = current.getDayOfWeek().getValue();
+                        int ourDayValue = javaDayValue == 7 ? 0 : javaDayValue;
+                        if (ourDayValue == b.getRecurringDayOfWeek()) {
+                            result.add(ClosedDayResponse.builder()
+                                    .date(current)
+                                    .reason(b.getReason())
+                                    .build());
+                        }
+                        current = current.plusDays(1);
+                    }
+                }
             }
         }
 
@@ -264,34 +314,74 @@ public class AvailabilityService {
     private boolean isLabOpenAt(Integer labId, Lab lab, OffsetDateTime dateTime) {
         LocalDate date = dateTime.toLocalDate();
         LocalTime time = dateTime.toLocalTime();
-        
-        // Check if it's a closed day
         int javaDayValue = date.getDayOfWeek().getValue();
         int dayOfWeek = javaDayValue == 7 ? 0 : javaDayValue;
-        
+
+        // Closed days: university → building → lab
         if (closedDayRepository.isLabClosedOnDate(labId, date, dayOfWeek)) {
             return false;
         }
+        if (lab.getBuilding() != null
+                && buildingClosedDayRepository.isBuildingClosedOnDate(lab.getBuilding().getId(), date, dayOfWeek)) {
+            return false;
+        }
 
-        // Check operating hours
-        LabOperatingHours hours = operatingHoursRepository.findByLabIdAndDayOfWeek(labId, dayOfWeek)
-                .orElse(null);
-
-        if (hours != null) {
-            if (hours.getIsClosed()) {
+        // Operating hours: Special (lab) → Special (building) → Lab → Building → Default
+        java.util.Optional<SpecialOperatingHours> labSpecial = specialOperatingHoursRepository
+                .findByLabIdAndSpecificDate(labId, date);
+        if (labSpecial.isPresent()) {
+            SpecialOperatingHours s = labSpecial.get();
+            if (Boolean.TRUE.equals(s.getIsClosed())) {
                 return false;
             }
-            return !time.isBefore(hours.getOpenTime()) && time.isBefore(hours.getCloseTime());
+            if (s.getOpenTime() != null && s.getCloseTime() != null) {
+                return !time.isBefore(s.getOpenTime()) && time.isBefore(s.getCloseTime());
+            }
+        }
+        if (lab.getBuilding() != null) {
+            java.util.Optional<SpecialOperatingHours> buildingSpecial = specialOperatingHoursRepository
+                    .findByBuildingIdAndSpecificDate(lab.getBuilding().getId(), date);
+            if (buildingSpecial.isPresent()) {
+                SpecialOperatingHours s = buildingSpecial.get();
+                if (Boolean.TRUE.equals(s.getIsClosed())) {
+                    return false;
+                }
+                if (s.getOpenTime() != null && s.getCloseTime() != null) {
+                    return !time.isBefore(s.getOpenTime()) && time.isBefore(s.getCloseTime());
+                }
+            }
+        }
+
+        // Regular lab operating hours
+        LabOperatingHours labHours = operatingHoursRepository.findByLabIdAndDayOfWeek(labId, dayOfWeek)
+                .orElse(null);
+        if (labHours != null) {
+            if (labHours.getIsClosed()) {
+                return false;
+            }
+            return !time.isBefore(labHours.getOpenTime()) && time.isBefore(labHours.getCloseTime());
+        }
+
+        // Fall back to building operating hours
+        if (lab.getBuilding() != null) {
+            BuildingOperatingHours buildingHours = buildingOperatingHoursRepository
+                    .findByBuildingIdAndDayOfWeek(lab.getBuilding().getId(), dayOfWeek)
+                    .orElse(null);
+            if (buildingHours != null) {
+                if (buildingHours.getIsClosed()) {
+                    return false;
+                }
+                return !time.isBefore(buildingHours.getOpenTime()) && time.isBefore(buildingHours.getCloseTime());
+            }
         }
 
         // Use lab defaults
         if (dayOfWeek == 0) { // Sunday
             return false;
         }
-        
         LocalTime openTime = lab.getDefaultOpenTime() != null ? lab.getDefaultOpenTime() : LocalTime.of(8, 0);
         LocalTime closeTime = lab.getDefaultCloseTime() != null ? lab.getDefaultCloseTime() : LocalTime.of(20, 0);
-        
         return !time.isBefore(openTime) && time.isBefore(closeTime);
     }
 }
+

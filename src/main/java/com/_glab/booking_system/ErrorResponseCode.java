@@ -5,6 +5,7 @@ public enum ErrorResponseCode {
     USER_EMAIL_ALREADY_EXISTS,
     USER_USERNAME_ALREADY_EXISTS,
     USER_INVALID_ROLE,
+    USER_NOT_FOUND,
 
     // Authentication / JWT
     AUTH_INVALID_TOKEN,

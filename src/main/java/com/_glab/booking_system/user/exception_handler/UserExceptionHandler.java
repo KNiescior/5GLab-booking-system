@@ -4,6 +4,7 @@ import com._glab.booking_system.ErrorResponse;
 import com._glab.booking_system.ErrorResponseCode;
 import com._glab.booking_system.user.exception.InvalidRoleException;
 import com._glab.booking_system.user.exception.UserAlreadyExistsException;
+import com._glab.booking_system.user.exception.UserNotFoundException;
 import com._glab.booking_system.user.exception.UsernameAlreadyExistsException;
 
 import lombok.extern.slf4j.Slf4j;
@@ -49,4 +50,15 @@ public class UserExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFoundException(UserNotFoundException e) {
+        log.warn("User not found: {}", e.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(
+                ErrorResponseCode.USER_NOT_FOUND,
+                e.getMessage() != null ? e.getMessage() : "User not found"
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
 }
+

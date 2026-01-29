@@ -45,6 +45,17 @@ public class Lab {
     @Column(name = "default_close_time")
     private LocalTime defaultCloseTime;
 
+    /**
+     * If false, lab is archived and excluded from default listings.
+     */
+    @Column(nullable = false)
+    private Boolean active = true;
+
+    /**
+     * When the lab was archived (soft delete). Null if active.
+     */
+    private OffsetDateTime archivedAt;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;

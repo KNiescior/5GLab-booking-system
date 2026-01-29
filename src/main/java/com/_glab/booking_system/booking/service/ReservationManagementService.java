@@ -1,5 +1,6 @@
 package com._glab.booking_system.booking.service;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -9,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com._glab.booking_system.auth.service.EmailService;
 import com._glab.booking_system.booking.exception.BookingNotAuthorizedException;
+import com._glab.booking_system.booking.exception.InvalidEditException;
 import com._glab.booking_system.booking.exception.ReservationNotFoundException;
 import com._glab.booking_system.booking.model.Reservation;
 import com._glab.booking_system.booking.model.ReservationStatus;
@@ -28,6 +30,21 @@ public class ReservationManagementService {
     private final ReservationService reservationService;
     private final LabManagerAuthorizationService authorizationService;
     private final EmailService emailService;
+
+    /**
+     * Get all reservations for admin with optional filters.
+     */
+    public List<ReservationResponse> getAllReservationsForAdmin(
+            ReservationStatus status,
+            Integer labId,
+            Integer userId,
+            OffsetDateTime dateFrom,
+            OffsetDateTime dateTo) {
+        List<Reservation> reservations = reservationRepository.findForAdmin(status, labId, userId, dateFrom, dateTo);
+        return reservations.stream()
+                .map(reservation -> reservationService.toReservationResponse(reservation))
+                .collect(Collectors.toList());
+    }
 
     /**
      * Get pending reservations for a lab manager or admin.
@@ -64,7 +81,11 @@ public class ReservationManagementService {
             throw new BookingNotAuthorizedException("You are not authorized to manage this reservation");
         }
 
-        // Only approve if status is PENDING
+        // Only approve if status is PENDING (not PENDING_EDIT_APPROVAL - resolve edit first)
+        if (reservation.getStatus() == ReservationStatus.PENDING_EDIT_APPROVAL) {
+            log.warn("Reservation {} has a pending edit proposal; resolve the edit first", reservationId);
+            throw new InvalidEditException("Reservation has a pending edit proposal. Resolve the edit first.");
+        }
         if (reservation.getStatus() != ReservationStatus.PENDING) {
             log.warn("Cannot approve reservation {} with status {}", reservationId, reservation.getStatus());
             throw new IllegalStateException("Only PENDING reservations can be approved");
@@ -99,7 +120,11 @@ public class ReservationManagementService {
             throw new BookingNotAuthorizedException("You are not authorized to manage this reservation");
         }
 
-        // Only decline if status is PENDING
+        // Only decline if status is PENDING (not PENDING_EDIT_APPROVAL - resolve edit first)
+        if (reservation.getStatus() == ReservationStatus.PENDING_EDIT_APPROVAL) {
+            log.warn("Reservation {} has a pending edit proposal; resolve the edit first", reservationId);
+            throw new InvalidEditException("Reservation has a pending edit proposal. Resolve the edit first.");
+        }
         if (reservation.getStatus() != ReservationStatus.PENDING) {
             log.warn("Cannot decline reservation {} with status {}", reservationId, reservation.getStatus());
             throw new IllegalStateException("Only PENDING reservations can be declined");

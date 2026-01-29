@@ -10,8 +10,11 @@ import org.springframework.data.repository.query.Param;
 
 import com._glab.booking_system.booking.model.ReservationEditProposal;
 import com._glab.booking_system.booking.model.ResolutionStatus;
+import com._glab.booking_system.user.model.User;
 
 public interface ReservationEditProposalRepository extends JpaRepository<ReservationEditProposal, UUID> {
+
+    List<ReservationEditProposal> findByEditedBy(User user);
 
     /**
      * Find active (PENDING) edit proposal for a reservation.
