@@ -91,9 +91,6 @@ class LabManagerReservationIntegrationTest {
     private SpecialOperatingHoursRepository specialOperatingHoursRepository;
 
     @Autowired
-    private LabRepository labRepository;
-
-    @Autowired
     private WorkstationRepository workstationRepository;
 
     @Autowired

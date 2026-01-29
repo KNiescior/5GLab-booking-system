@@ -89,9 +89,6 @@ class ProfessorReservationEditIntegrationTest {
     private SpecialOperatingHoursRepository specialOperatingHoursRepository;
 
     @Autowired
-    private LabRepository labRepository;
-
-    @Autowired
     private WorkstationRepository workstationRepository;
 
     @Autowired
