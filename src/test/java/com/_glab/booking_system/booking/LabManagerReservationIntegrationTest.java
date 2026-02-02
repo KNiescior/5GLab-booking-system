@@ -146,21 +146,6 @@ class LabManagerReservationIntegrationTest {
                     role.setName(RoleName.ADMIN);
                     return roleRepository.save(role);
                 });
-        userRepository.deleteAll();
-        roleRepository.deleteAll();
-
-        // Create roles
-        professorRole = new Role();
-        professorRole.setName(RoleName.PROFESSOR);
-        professorRole = roleRepository.save(professorRole);
-
-        labManagerRole = new Role();
-        labManagerRole.setName(RoleName.LAB_MANAGER);
-        labManagerRole = roleRepository.save(labManagerRole);
-
-        adminRole = new Role();
-        adminRole.setName(RoleName.ADMIN);
-        adminRole = roleRepository.save(adminRole);
 
         // Create professor user
         professorUser = new User();
