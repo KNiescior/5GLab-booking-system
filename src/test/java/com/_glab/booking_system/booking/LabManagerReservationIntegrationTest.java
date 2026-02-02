@@ -120,21 +120,32 @@ class LabManagerReservationIntegrationTest {
         workstationRepository.deleteAll();
         labRepository.deleteAll();
         buildingRepository.deleteAll();
-        userRepository.deleteAll();
-        roleRepository.deleteAll();
+        // Delete all users except the anonymous system user
+        userRepository.findAll().stream()
+                .filter(u -> !Boolean.TRUE.equals(u.getIsAnonymous()))
+                .forEach(userRepository::delete);
 
-        // Create roles
-        professorRole = new Role();
-        professorRole.setName(RoleName.PROFESSOR);
-        professorRole = roleRepository.save(professorRole);
+        // Get or create roles (might exist from DataInitializer for anonymous user)
+        professorRole = roleRepository.findByName(RoleName.PROFESSOR)
+                .orElseGet(() -> {
+                    Role role = new Role();
+                    role.setName(RoleName.PROFESSOR);
+                    return roleRepository.save(role);
+                });
 
-        labManagerRole = new Role();
-        labManagerRole.setName(RoleName.LAB_MANAGER);
-        labManagerRole = roleRepository.save(labManagerRole);
+        labManagerRole = roleRepository.findByName(RoleName.LAB_MANAGER)
+                .orElseGet(() -> {
+                    Role role = new Role();
+                    role.setName(RoleName.LAB_MANAGER);
+                    return roleRepository.save(role);
+                });
 
-        adminRole = new Role();
-        adminRole.setName(RoleName.ADMIN);
-        adminRole = roleRepository.save(adminRole);
+        adminRole = roleRepository.findByName(RoleName.ADMIN)
+                .orElseGet(() -> {
+                    Role role = new Role();
+                    role.setName(RoleName.ADMIN);
+                    return roleRepository.save(role);
+                });
 
         // Create professor user
         professorUser = new User();
