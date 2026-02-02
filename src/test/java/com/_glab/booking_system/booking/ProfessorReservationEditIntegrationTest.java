@@ -136,17 +136,25 @@ class ProfessorReservationEditIntegrationTest {
         buildingOperatingHoursRepository.deleteAll();
         labRepository.deleteAll();
         buildingRepository.deleteAll();
-        userRepository.deleteAll();
-        roleRepository.deleteAll();
+        // Delete all users except the anonymous system user
+        userRepository.findAll().stream()
+                .filter(u -> !Boolean.TRUE.equals(u.getIsAnonymous()))
+                .forEach(userRepository::delete);
 
-        // Create roles
-        Role professorRole = new Role();
-        professorRole.setName(RoleName.PROFESSOR);
-        professorRole = roleRepository.save(professorRole);
+        // Get or create roles (might exist from DataInitializer for anonymous user)
+        Role professorRole = roleRepository.findByName(RoleName.PROFESSOR)
+                .orElseGet(() -> {
+                    Role role = new Role();
+                    role.setName(RoleName.PROFESSOR);
+                    return roleRepository.save(role);
+                });
 
-        Role labManagerRole = new Role();
-        labManagerRole.setName(RoleName.LAB_MANAGER);
-        labManagerRole = roleRepository.save(labManagerRole);
+        Role labManagerRole = roleRepository.findByName(RoleName.LAB_MANAGER)
+                .orElseGet(() -> {
+                    Role role = new Role();
+                    role.setName(RoleName.LAB_MANAGER);
+                    return roleRepository.save(role);
+                });
 
         // Create users
         professorUser = new User();

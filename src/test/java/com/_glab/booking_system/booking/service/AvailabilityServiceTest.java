@@ -1,7 +1,15 @@
 package com._glab.booking_system.booking.service;
 
 import com._glab.booking_system.booking.model.*;
-import com._glab.booking_system.booking.repository.*;
+import com._glab.booking_system.booking.repository.BuildingClosedDayRepository;
+import com._glab.booking_system.booking.repository.BuildingOperatingHoursRepository;
+import com._glab.booking_system.booking.repository.LabClosedDayRepository;
+import com._glab.booking_system.booking.repository.LabOperatingHoursRepository;
+import com._glab.booking_system.booking.repository.LabRepository;
+import com._glab.booking_system.booking.repository.ReservationRepository;
+import com._glab.booking_system.booking.repository.ReservationWorkstationRepository;
+import com._glab.booking_system.booking.repository.SpecialOperatingHoursRepository;
+import com._glab.booking_system.booking.repository.WorkstationRepository;
 import com._glab.booking_system.booking.response.*;
 import com._glab.booking_system.user.model.Role;
 import com._glab.booking_system.user.model.RoleName;
@@ -120,6 +128,7 @@ class AvailabilityServiceTest {
 
             when(labRepository.findById(1)).thenReturn(Optional.of(testLab));
             when(operatingHoursRepository.findByLabId(1)).thenReturn(new ArrayList<>());
+            when(buildingOperatingHoursRepository.findByBuildingId(1)).thenReturn(new ArrayList<>());
             when(closedDayRepository.findSpecificClosuresInRange(anyInt(), any(), any()))
                     .thenReturn(new ArrayList<>());
             when(closedDayRepository.findRecurringClosures(1)).thenReturn(new ArrayList<>());
@@ -149,6 +158,7 @@ class AvailabilityServiceTest {
 
             when(labRepository.findById(1)).thenReturn(Optional.of(testLab));
             when(operatingHoursRepository.findByLabId(1)).thenReturn(new ArrayList<>());
+            when(buildingOperatingHoursRepository.findByBuildingId(1)).thenReturn(new ArrayList<>());
             when(closedDayRepository.findSpecificClosuresInRange(anyInt(), any(), any()))
                     .thenReturn(new ArrayList<>());
             when(closedDayRepository.findRecurringClosures(1)).thenReturn(new ArrayList<>());
@@ -170,6 +180,7 @@ class AvailabilityServiceTest {
 
             when(labRepository.findById(1)).thenReturn(Optional.of(testLab));
             when(operatingHoursRepository.findByLabId(1)).thenReturn(new ArrayList<>());
+            when(buildingOperatingHoursRepository.findByBuildingId(1)).thenReturn(new ArrayList<>());
             when(closedDayRepository.findSpecificClosuresInRange(anyInt(), any(), any()))
                     .thenReturn(new ArrayList<>());
             when(closedDayRepository.findRecurringClosures(1)).thenReturn(new ArrayList<>());
@@ -196,6 +207,7 @@ class AvailabilityServiceTest {
 
             when(labRepository.findById(1)).thenReturn(Optional.of(testLab));
             when(operatingHoursRepository.findByLabId(1)).thenReturn(List.of(mondayHours));
+            when(buildingOperatingHoursRepository.findByBuildingId(1)).thenReturn(new ArrayList<>());
             when(closedDayRepository.findSpecificClosuresInRange(anyInt(), any(), any()))
                     .thenReturn(new ArrayList<>());
             when(closedDayRepository.findRecurringClosures(1)).thenReturn(new ArrayList<>());
@@ -205,8 +217,9 @@ class AvailabilityServiceTest {
             // When
             LabAvailabilityResponse response = availabilityService.getWeeklyAvailability(1, null);
 
-            // Then - getOperatingHours returns 7 days (0-6); Monday is day 1
+            // Then - service returns all 7 days, Monday has specific hours, others have defaults
             assertThat(response.getOperatingHours()).hasSize(7);
+            // Find Monday's entry (dayOfWeek=1)
             OperatingHoursResponse mondayResponse = response.getOperatingHours().stream()
                     .filter(h -> h.getDayOfWeek() == 1)
                     .findFirst()
@@ -230,6 +243,7 @@ class AvailabilityServiceTest {
 
             when(labRepository.findById(1)).thenReturn(Optional.of(testLab));
             when(operatingHoursRepository.findByLabId(1)).thenReturn(new ArrayList<>());
+            when(buildingOperatingHoursRepository.findByBuildingId(1)).thenReturn(new ArrayList<>());
             when(closedDayRepository.findSpecificClosuresInRange(eq(1), eq(monday), eq(monday.plusDays(6))))
                     .thenReturn(List.of(closedDay));
             when(closedDayRepository.findRecurringClosures(1)).thenReturn(new ArrayList<>());
@@ -264,6 +278,7 @@ class AvailabilityServiceTest {
 
             when(labRepository.findById(1)).thenReturn(Optional.of(testLab));
             when(operatingHoursRepository.findByLabId(1)).thenReturn(new ArrayList<>());
+            when(buildingOperatingHoursRepository.findByBuildingId(1)).thenReturn(new ArrayList<>());
             when(closedDayRepository.findSpecificClosuresInRange(anyInt(), any(), any()))
                     .thenReturn(new ArrayList<>());
             when(closedDayRepository.findRecurringClosures(1)).thenReturn(new ArrayList<>());
