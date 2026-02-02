@@ -2,18 +2,6 @@
 
 This document tracks planned features and improvements for the 5GLab Booking System.
 
-## High Priority (Core Functionality)
-
-### Lab Manager Features
-- [ ] **Approve/Reject reservations** - Endpoints for lab managers to review and approve/reject pending requests
-- [ ] **Edit reservations** - Allow lab managers to modify reservation details (time, workstations)
-- [ ] **View pending requests** - Dashboard/endpoint to see all pending reservations for managed labs
-- [ ] **Bulk actions for recurring** - Approve/reject entire recurring series at once
-
-### Status Change Notifications
-- [ ] **Email on approval** - Notify user when reservation is approved
-- [ ] **Email on rejection** - Notify user when reservation is rejected (with reason)
-
 ## Medium Priority (Enhancements)
 
 ### Reminder System
@@ -51,6 +39,10 @@ This document tracks planned features and improvements for the 5GLab Booking Sys
 - [x] User registration (admin-only)
 - [x] Account lockout policy (tiered: 3 attempts → 10 min, 6+ → 30 min)
 - [x] Token reuse detection security
+- [x] User self-profile editing (`GET/PUT /users/me`)
+- [x] Admin user profile editing and role management (`AdminUserController`)
+- [x] Account deactivation (soft delete)
+- [x] Account hard delete with GDPR compliance (anonymous user placeholder)
 
 ### Lab Booking System (from lab_booking_form plan)
 - [x] Database entities: Building, Lab, Workstation, LabManager, LabOperatingHours, LabClosedDay, Reservation, ReservationWorkstation, RecurringPattern
@@ -63,3 +55,33 @@ This document tracks planned features and improvements for the 5GLab Booking Sys
 - [x] Get reservation endpoints (`GET /reservations/{id}`, `GET /reservations/me`)
 - [x] Recurring reservation pattern support (WEEKLY, BIWEEKLY, MONTHLY, CUSTOM)
 - [x] Email notifications for reservation submission (user confirmation + lab manager notification)
+
+### Lab Manager Features (from lab_manager_reservation_management plan)
+- [x] `PENDING_EDIT_APPROVAL` status for edit workflow
+- [x] Lab manager authorization service (permission checks)
+- [x] View pending reservations (`GET /manager/reservations/pending`)
+- [x] Approve/decline single reservations (`POST /manager/reservations/{id}/approve`, `/decline`)
+- [x] Edit reservations with professor approval workflow (`POST /manager/reservations/{id}/edit`)
+- [x] Approve/reject professor edits (`POST /manager/reservations/{id}/edit/approve`, `/reject`)
+- [x] Recurring group management (approve/decline/edit entire groups)
+- [x] Individual occurrence management (approve/decline/edit single occurrences)
+- [x] Professor self-editing with automatic or approval-required flow
+- [x] Professor edit approval/rejection endpoints
+- [x] `ReservationEditProposal` entity for storing original/proposed values
+- [x] Email notifications for edit proposals, approvals, and rejections
+- [x] Email on reservation approval
+- [x] Email on reservation rejection (with reason)
+
+### Admin Features (from admin-options-implementation plan)
+- [x] Building CRUD with soft delete (`AdminBuildingController`)
+- [x] Lab CRUD with soft delete and manager assignment (`AdminLabController`)
+- [x] Workstation CRUD (`AdminWorkstationController`)
+- [x] Building operating hours management
+- [x] Lab operating hours with building inheritance
+- [x] Special day operating hours override
+- [x] University-wide days off management (`AdminDaysOffController`)
+- [x] Building days off management
+- [x] Lab days off management (with lab manager access)
+- [x] Admin reservation management (`AdminReservationController`)
+- [x] Log rotation configuration (logback-spring.xml)
+- [x] Log access API with filtering and pagination (`GET /admin/logs`)

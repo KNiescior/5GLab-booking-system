@@ -906,6 +906,149 @@ Authorization: Bearer <access_token>
 | `APPROVED` | Approved by lab manager |
 | `REJECTED` | Rejected by lab manager |
 | `CANCELLED` | Cancelled by the user |
+| `PENDING_EDIT_APPROVAL` | Reservation has been edited and is awaiting approval |
+
+---
+
+### Professor Edit Endpoints
+
+Professors can edit their own reservations. The behavior depends on the current status:
+- **PENDING reservations**: Changes are applied automatically, lab manager is notified
+- **APPROVED reservations**: Creates an edit proposal requiring lab manager re-approval
+
+#### POST /reservations/{id}/edit
+
+Edit your own reservation.
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request
+
+```http
+POST /api/v1/reservations/550e8400-e29b-41d4-a716-446655440000/edit
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "startTime": "2026-01-20T11:00:00+01:00",
+  "endTime": "2026-01-20T13:00:00+01:00",
+  "description": "Updated project work",
+  "wholeLab": false,
+  "workstationIds": [1, 2, 3]
+}
+```
+
+##### Response (204 No Content)
+
+No response body.
+
+##### Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 403 | `BOOKING_NOT_RESERVATION_OWNER` | User is not the owner of this reservation |
+| 404 | `BOOKING_RESERVATION_NOT_FOUND` | Reservation not found |
+
+---
+
+#### POST /reservations/{id}/edit/approve
+
+Approve a lab manager's edit of your reservation.
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request
+
+```http
+POST /api/v1/reservations/550e8400-e29b-41d4-a716-446655440000/edit/approve
+Authorization: Bearer <access_token>
+```
+
+##### Response (204 No Content)
+
+No response body.
+
+---
+
+#### POST /reservations/{id}/edit/reject
+
+Reject a lab manager's edit of your reservation.
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request
+
+```http
+POST /api/v1/reservations/550e8400-e29b-41d4-a716-446655440000/edit/reject
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "reason": "The new time doesn't work for my schedule"
+}
+```
+
+##### Response (204 No Content)
+
+No response body.
+
+---
+
+#### POST /reservations/recurring/{groupId}/edit
+
+Edit all occurrences in your recurring group.
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request
+
+```http
+POST /api/v1/reservations/recurring/660e8400-e29b-41d4-a716-446655440000/edit
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "startTime": "2026-01-20T11:00:00+01:00",
+  "endTime": "2026-01-20T13:00:00+01:00",
+  "description": "Updated weekly meeting"
+}
+```
+
+##### Response (204 No Content)
+
+No response body.
+
+---
+
+#### POST /reservations/recurring/{groupId}/edit/approve
+
+Approve lab manager's edit of your recurring group.
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Response (204 No Content)
+
+---
+
+#### POST /reservations/recurring/{groupId}/edit/reject
+
+Reject lab manager's edit of your recurring group.
+
+**Requires Authentication**: Yes (Bearer token)
+
+##### Request
+
+```http
+POST /api/v1/reservations/recurring/660e8400-e29b-41d4-a716-446655440000/edit/reject
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "reason": "I prefer the original times"
+}
+```
+
+##### Response (204 No Content)
 
 ---
 
@@ -920,9 +1063,326 @@ Authorization: Bearer <access_token>
 
 ---
 
+## Lab Manager Reservation Endpoints
+
+Endpoints for lab managers to manage reservation requests for their assigned labs. Admin users have full access to manage reservations for all labs.
+
+### GET /manager/reservations/pending
+
+Get all pending reservations for labs you manage.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Request
+
+```http
+GET /api/v1/manager/reservations/pending
+Authorization: Bearer <access_token>
+```
+
+#### Response (200 OK)
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "labId": 1,
+    "labName": "Computer Lab A",
+    "startTime": "2026-01-20T10:00:00+01:00",
+    "endTime": "2026-01-20T12:00:00+01:00",
+    "description": "Project work session",
+    "status": "PENDING",
+    "wholeLab": false,
+    "workstationIds": [1, 2],
+    "recurringGroupId": null,
+    "createdAt": "2026-01-19T14:30:00Z",
+    "userName": "John Doe"
+  }
+]
+```
+
+---
+
+### GET /manager/reservations/{id}
+
+Get detailed information about a specific reservation.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Response (200 OK)
+
+Returns `ReservationResponse` with edit proposal details if status is `PENDING_EDIT_APPROVAL`.
+
+---
+
+### POST /manager/reservations/{id}/approve
+
+Approve a pending reservation.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Request
+
+```http
+POST /api/v1/manager/reservations/550e8400-e29b-41d4-a716-446655440000/approve
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "reason": "Approved for weekly lab session"
+}
+```
+
+**Note**: Request body is optional.
+
+#### Response (204 No Content)
+
+Email notification is sent to the reservation owner.
+
+---
+
+### POST /manager/reservations/{id}/decline
+
+Decline/reject a pending reservation.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Request
+
+```http
+POST /api/v1/manager/reservations/550e8400-e29b-41d4-a716-446655440000/decline
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "reason": "Lab is reserved for maintenance that day"
+}
+```
+
+#### Response (204 No Content)
+
+Email notification is sent to the reservation owner with the rejection reason.
+
+---
+
+### POST /manager/reservations/{id}/edit
+
+Edit a reservation (creates edit proposal requiring professor approval).
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Request
+
+```http
+POST /api/v1/manager/reservations/550e8400-e29b-41d4-a716-446655440000/edit
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "startTime": "2026-01-20T14:00:00+01:00",
+  "endTime": "2026-01-20T16:00:00+01:00",
+  "description": "Moved to afternoon slot",
+  "wholeLab": false,
+  "workstationIds": [1, 2, 3]
+}
+```
+
+#### Response (204 No Content)
+
+Sets reservation status to `PENDING_EDIT_APPROVAL`. Email is sent to professor for approval.
+
+---
+
+### POST /manager/reservations/{id}/edit/approve
+
+Approve a professor's edit of a reservation.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Response (204 No Content)
+
+---
+
+### POST /manager/reservations/{id}/edit/reject
+
+Reject a professor's edit of a reservation.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Request
+
+```http
+POST /api/v1/manager/reservations/550e8400-e29b-41d4-a716-446655440000/edit/reject
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "reason": "The requested time conflicts with another approved reservation"
+}
+```
+
+#### Response (204 No Content)
+
+Original values are restored and email is sent to professor.
+
+---
+
+### Recurring Group Management
+
+#### POST /manager/reservations/recurring/{groupId}/approve
+
+Approve all occurrences in a recurring group.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Response (204 No Content)
+
+---
+
+#### POST /manager/reservations/recurring/{groupId}/decline
+
+Decline all occurrences in a recurring group.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Response (204 No Content)
+
+---
+
+#### POST /manager/reservations/recurring/{groupId}/edit
+
+Edit all occurrences in a recurring group.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Response (204 No Content)
+
+---
+
+#### POST /manager/reservations/recurring/{groupId}/edit/approve
+
+Approve professor's edit of a recurring group.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Response (204 No Content)
+
+---
+
+#### POST /manager/reservations/recurring/{groupId}/edit/reject
+
+Reject professor's edit of a recurring group.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Response (204 No Content)
+
+---
+
+### Individual Occurrence Management
+
+#### POST /manager/reservations/recurring/{groupId}/occurrences/{id}/approve
+
+Approve a single occurrence within a recurring group.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Response (204 No Content)
+
+---
+
+#### POST /manager/reservations/recurring/{groupId}/occurrences/{id}/decline
+
+Decline a single occurrence within a recurring group.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Response (204 No Content)
+
+---
+
+#### POST /manager/reservations/recurring/{groupId}/occurrences/{id}/edit
+
+Edit a single occurrence within a recurring group.
+
+**Requires Authentication**: Yes (Bearer token, LAB_MANAGER or ADMIN role)
+
+#### Response (204 No Content)
+
+---
+
 ## User Management Endpoints
 
-User management endpoints for admin operations.
+User management endpoints for user profiles and admin operations.
+
+### GET /users/me
+
+Get current authenticated user's profile.
+
+**Requires Authentication**: Yes (Bearer token)
+
+#### Request
+
+```http
+GET /api/v1/users/me
+Authorization: Bearer <access_token>
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "username": "johsmi",
+  "firstName": "John",
+  "lastName": "Smith",
+  "degree": "DR",
+  "role": "PROFESSOR",
+  "enabled": true,
+  "createdAt": "2026-01-13T12:00:00Z"
+}
+```
+
+---
+
+### PUT /users/me
+
+Update current authenticated user's profile.
+
+**Requires Authentication**: Yes (Bearer token)
+
+#### Request
+
+```http
+PUT /api/v1/users/me
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "firstName": "Jonathan",
+  "lastName": "Smith",
+  "degree": "DR_HAB"
+}
+```
+
+#### Response (200 OK)
+
+Returns updated `UserResponse`.
+
+---
+
+### DELETE /users/me
+
+Deactivate own account (soft delete).
+
+**Requires Authentication**: Yes (Bearer token)
+
+#### Response (200 OK)
+
+Returns deactivated `UserResponse` with `enabled: false`.
+
+---
 
 ### POST /users
 
@@ -1069,6 +1529,710 @@ Authorization: Bearer <admin_access_token>
 
 ---
 
+---
+
+## Admin Endpoints
+
+Admin-only endpoints for managing users, buildings, labs, workstations, days off, reservations, and logs.
+
+### Admin User Management
+
+#### PUT /admin/users/{id}
+
+Update any user's profile.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+PUT /api/v1/admin/users/1
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
+{
+  "firstName": "Jonathan",
+  "lastName": "Smith",
+  "degree": "PROF",
+  "roleName": "LAB_MANAGER"
+}
+```
+
+##### Response (200 OK)
+
+Returns updated `UserResponse`.
+
+---
+
+#### PATCH /admin/users/{id}/role
+
+Change a user's role.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+PATCH /api/v1/admin/users/1/role
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
+{
+  "roleName": "LAB_MANAGER"
+}
+```
+
+##### Response (200 OK)
+
+Returns updated `UserResponse`.
+
+---
+
+#### DELETE /admin/users/{id}
+
+Deactivate a user (soft delete).
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Response (200 OK)
+
+Returns deactivated `UserResponse` with `enabled: false`.
+
+---
+
+#### DELETE /admin/users/{id}/hard
+
+Hard delete a user (GDPR compliance). Reassigns reservations to anonymous user and deletes all related data.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Response (204 No Content)
+
+---
+
+### Admin Building Management
+
+#### POST /admin/buildings
+
+Create a new building.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+POST /api/v1/admin/buildings
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
+{
+  "name": "Engineering Building",
+  "description": "Main engineering facility",
+  "address": "123 University Ave",
+  "city": "Warsaw"
+}
+```
+
+##### Response (201 Created)
+
+Returns created `Building` object.
+
+---
+
+#### GET /admin/buildings
+
+List all buildings (including archived).
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Response (200 OK)
+
+Returns array of `Building` objects.
+
+---
+
+#### GET /admin/buildings/{id}
+
+Get building by ID.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### PUT /admin/buildings/{id}
+
+Update a building.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### DELETE /admin/buildings/{id}
+
+Archive a building (soft delete).
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### DELETE /admin/buildings/{id}/hard
+
+Hard delete a building.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### GET /admin/buildings/{id}/operating-hours
+
+Get building operating hours.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### POST /admin/buildings/{id}/operating-hours
+
+Set building operating hours for a day.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+POST /api/v1/admin/buildings/1/operating-hours
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
+{
+  "dayOfWeek": 1,
+  "openTime": "08:00:00",
+  "closeTime": "20:00:00",
+  "isClosed": false
+}
+```
+
+---
+
+#### PUT /admin/buildings/{id}/operating-hours/{dayOfWeek}
+
+Update building operating hours for a specific day.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### DELETE /admin/buildings/{id}/operating-hours/{dayOfWeek}
+
+Delete building operating hours for a specific day.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### GET /admin/buildings/{id}/days-off
+
+Get building-specific days off.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### POST /admin/buildings/{id}/days-off
+
+Add a building day off.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+POST /api/v1/admin/buildings/1/days-off
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
+{
+  "specificDate": "2026-12-25",
+  "reason": "Christmas Holiday"
+}
+```
+
+---
+
+#### PUT /admin/buildings/{id}/days-off/{dayOffId}
+
+Update a building day off.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### DELETE /admin/buildings/{id}/days-off/{dayOffId}
+
+Delete a building day off.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+### Admin Lab Management
+
+#### POST /admin/labs
+
+Create a new lab.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+POST /api/v1/admin/labs
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
+{
+  "buildingId": 1,
+  "name": "Computer Lab A",
+  "description": "General purpose computer lab",
+  "capacity": 30,
+  "defaultOpenTime": "08:00:00",
+  "defaultCloseTime": "20:00:00"
+}
+```
+
+---
+
+#### GET /admin/labs
+
+List all labs (including archived).
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### GET /admin/labs/{id}
+
+Get lab by ID.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### PUT /admin/labs/{id}
+
+Update a lab.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### DELETE /admin/labs/{id}
+
+Archive a lab (soft delete).
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### DELETE /admin/labs/{id}/hard
+
+Hard delete a lab.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### GET /admin/labs/{id}/managers
+
+Get lab managers for a lab.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Response (200 OK)
+
+```json
+[
+  {
+    "id": 1,
+    "userId": 2,
+    "email": "manager@example.com",
+    "firstName": "Jane",
+    "lastName": "Doe",
+    "isPrimary": true,
+    "assignedAt": "2026-01-15T10:00:00Z"
+  }
+]
+```
+
+---
+
+#### POST /admin/labs/{id}/managers
+
+Assign a user as lab manager.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+POST /api/v1/admin/labs/1/managers
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
+{
+  "userId": 2
+}
+```
+
+---
+
+#### DELETE /admin/labs/{id}/managers/{userId}
+
+Remove a lab manager.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### GET /admin/labs/{id}/operating-hours
+
+Get lab operating hours.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### POST /admin/labs/{id}/operating-hours
+
+Set lab operating hours for a day.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### PUT /admin/labs/{id}/operating-hours/{dayOfWeek}
+
+Update lab operating hours for a specific day.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### DELETE /admin/labs/{id}/operating-hours/{dayOfWeek}
+
+Delete lab operating hours for a specific day (falls back to building hours).
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### GET /admin/labs/{id}/special-hours
+
+Get lab special operating hours (date overrides).
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### POST /admin/labs/{id}/special-hours
+
+Set special operating hours for a specific date.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+POST /api/v1/admin/labs/1/special-hours
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
+{
+  "date": "2026-01-20",
+  "openTime": "10:00:00",
+  "closeTime": "16:00:00",
+  "isClosed": false,
+  "reason": "Shortened hours for event"
+}
+```
+
+---
+
+#### DELETE /admin/labs/{id}/special-hours/{specialHoursId}
+
+Delete special operating hours.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### GET /admin/labs/{id}/days-off
+
+Get lab-specific days off.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### POST /admin/labs/{id}/days-off
+
+Add a lab day off.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### PUT /admin/labs/{id}/days-off/{dayOffId}
+
+Update a lab day off.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### DELETE /admin/labs/{id}/days-off/{dayOffId}
+
+Delete a lab day off.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+### Admin Workstation Management
+
+#### POST /admin/workstations
+
+Create a new workstation.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+POST /api/v1/admin/workstations
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
+{
+  "labId": 1,
+  "identifier": "WS-01",
+  "description": "Window seat with dual monitors"
+}
+```
+
+---
+
+#### GET /admin/workstations
+
+List all workstations (optionally filter by labId).
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+GET /api/v1/admin/workstations?labId=1
+Authorization: Bearer <admin_access_token>
+```
+
+---
+
+#### GET /admin/workstations/{id}
+
+Get workstation by ID.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### PUT /admin/workstations/{id}
+
+Update a workstation.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+PUT /api/v1/admin/workstations/1
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
+{
+  "identifier": "WS-01-UPDATED",
+  "description": "Updated description",
+  "active": false
+}
+```
+
+---
+
+#### DELETE /admin/workstations/{id}
+
+Archive a workstation (soft delete).
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+### Admin University Days Off
+
+#### GET /admin/university/days-off
+
+Get all university-wide days off.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### POST /admin/university/days-off
+
+Add a university-wide day off.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+POST /api/v1/admin/university/days-off
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
+{
+  "specificDate": "2026-05-01",
+  "reason": "Labor Day"
+}
+```
+
+---
+
+#### PUT /admin/university/days-off/{id}
+
+Update a university day off.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### DELETE /admin/university/days-off/{id}
+
+Delete a university day off.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+### Admin Reservation Management
+
+#### GET /admin/reservations
+
+List all reservations with optional filters.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+GET /api/v1/admin/reservations?status=PENDING&labId=1&userId=2&dateFrom=2026-01-01T00:00:00Z&dateTo=2026-12-31T23:59:59Z
+Authorization: Bearer <admin_access_token>
+```
+
+**Query Parameters**:
+- `status` (optional) - Filter by status: `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`, `PENDING_EDIT_APPROVAL`
+- `labId` (optional) - Filter by lab ID
+- `userId` (optional) - Filter by user ID
+- `dateFrom` (optional) - Filter by start date (ISO 8601)
+- `dateTo` (optional) - Filter by end date (ISO 8601)
+
+---
+
+#### GET /admin/reservations/{id}
+
+Get reservation by ID.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### POST /admin/reservations/{id}/approve
+
+Approve a reservation.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### POST /admin/reservations/{id}/decline
+
+Decline a reservation.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### POST /admin/reservations/{id}/edit
+
+Edit a reservation (creates edit proposal).
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### POST /admin/reservations/{id}/edit/approve
+
+Approve professor's edit.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+#### POST /admin/reservations/{id}/edit/reject
+
+Reject professor's edit.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+---
+
+### Admin Log Access
+
+#### GET /admin/logs
+
+Get application logs with filtering and pagination.
+
+**Requires Authentication**: Yes (Bearer token, ADMIN role)
+
+##### Request
+
+```http
+GET /api/v1/admin/logs?level=ERROR&dateFrom=2026-01-01&dateTo=2026-01-31&search=authentication&page=0&size=100
+Authorization: Bearer <admin_access_token>
+```
+
+**Query Parameters**:
+- `level` (optional) - Filter by log level: `DEBUG`, `INFO`, `WARN`, `ERROR`
+- `dateFrom` (optional) - Start date (ISO date)
+- `dateTo` (optional) - End date (ISO date)
+- `search` (optional) - Search term
+- `page` (default: 0) - Page number
+- `size` (default: 100, max: 500) - Page size
+
+##### Response (200 OK)
+
+```json
+[
+  {
+    "timestamp": "2026-01-20T10:30:00Z",
+    "level": "ERROR",
+    "logger": "c._g.b.auth.controller.LoginController",
+    "message": "Account user@example.com locked for 10 minutes after 3 failed attempts from IP 192.168.1.100",
+    "thread": "http-nio-8080-exec-1"
+  }
+]
+```
+
+---
+
 ## Using Access Tokens
 
 ### Authorization Header
@@ -1173,6 +2337,12 @@ All API errors follow this format:
 | `BOOKING_INVALID_RECURRING_PATTERN` | 400 | Invalid recurring pattern configuration |
 | `BOOKING_NO_VALID_OCCURRENCES` | 400 | Recurring pattern produces no valid dates |
 | `BOOKING_NOT_AUTHORIZED` | 403 | User not authorized for this booking action |
+| `BOOKING_NOT_LAB_MANAGER` | 403 | User is not a lab manager for this lab |
+| `BOOKING_NOT_RESERVATION_OWNER` | 403 | User is not the owner of this reservation |
+| `BOOKING_EDIT_PROPOSAL_NOT_FOUND` | 404 | No edit proposal exists for this reservation |
+| `BOOKING_INVALID_EDIT` | 400 | Edit validation failed |
+| `BOOKING_EDIT_ALREADY_RESOLVED` | 409 | Edit proposal has already been approved/rejected |
+| `BOOKING_INVALID_STATE` | 400 | Reservation is in an invalid state for this operation |
 
 ---
 

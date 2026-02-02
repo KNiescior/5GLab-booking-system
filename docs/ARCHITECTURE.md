@@ -384,16 +384,40 @@ When a refresh token is used after it has been rotated:
                                                         │ end_date                │
                                                         │ occurrences             │
                                                         └─────────────────────────┘
+
+┌───────────────────────────────┐
+│   reservation_edit_proposal   │
+├───────────────────────────────┤
+│ id (UUID PK)                  │
+│ reservation_id (FK)           │
+│ edited_by (FK → account)      │
+│ original_status               │
+│ original_start_time           │
+│ original_end_time             │
+│ original_description          │
+│ original_whole_lab            │
+│ original_workstation_ids      │  ← JSON column
+│ proposed_start_time           │
+│ proposed_end_time             │
+│ proposed_description          │
+│ proposed_whole_lab            │
+│ proposed_workstation_ids      │  ← JSON column
+│ resolution                    │  ← PENDING/APPROVED/REJECTED
+│ resolved_by (FK → account)    │
+│ resolved_at                   │
+│ created_at                    │
+└───────────────────────────────┘
 ```
 
 ### Booking Enums
 
 ```java
 public enum ReservationStatus {
-    PENDING,    // Awaiting lab manager review
-    APPROVED,   // Approved by lab manager
-    REJECTED,   // Rejected by lab manager
-    CANCELLED   // Cancelled by user
+    PENDING,               // Awaiting lab manager review
+    APPROVED,              // Approved by lab manager
+    REJECTED,              // Rejected by lab manager
+    CANCELLED,             // Cancelled by user
+    PENDING_EDIT_APPROVAL  // Edited, awaiting approval
 }
 
 public enum RecurrenceType {
@@ -615,9 +639,20 @@ com._glab.booking_system
 │       ├── EmailService          # Centralized email sending
 │       └── CustomUserDetailsService
 │
+├── admin/                         # Admin Module
+│   ├── controller/
+│   │   └── LogController         # Log access endpoints
+│   │
+│   ├── response/
+│   │   └── LogEntryResponse      # Log entry DTO
+│   │
+│   └── service/
+│       └── LogService            # Log file parsing and filtering
+│
 ├── user/                          # User Module
 │   ├── controller/
-│   │   └── UserController        # Admin-only user registration
+│   │   ├── UserController        # User profile and admin registration
+│   │   └── AdminUserController   # Admin user management
 │   │
 │   ├── exception/
 │   │   ├── UserAlreadyExistsException
@@ -645,9 +680,16 @@ com._glab.booking_system
 │
 ├── booking/                       # Lab Booking Module
 │   ├── controller/
-│   │   ├── BuildingController    # Building discovery endpoints
-│   │   ├── LabController         # Lab details & availability
-│   │   └── ReservationController # Reservation CRUD
+│   │   ├── BuildingController         # Building discovery endpoints
+│   │   ├── LabController              # Lab details & availability
+│   │   ├── ReservationController      # Reservation CRUD & professor edits
+│   │   ├── LabManagerReservationController  # Lab manager reservation management
+│   │   ├── LabManagerController       # Lab manager lab operations
+│   │   ├── AdminBuildingController    # Admin building CRUD
+│   │   ├── AdminLabController         # Admin lab CRUD & manager assignment
+│   │   ├── AdminWorkstationController # Admin workstation CRUD
+│   │   ├── AdminDaysOffController     # University-wide days off
+│   │   └── AdminReservationController # Admin reservation management
 │   │
 │   ├── exception/
 │   │   ├── LabNotFoundException
@@ -669,26 +711,34 @@ com._glab.booking_system
 │   │
 │   ├── model/
 │   │   ├── Building              # Building entity
+│   │   ├── BuildingOperatingHours# Building per-day operating hours
+│   │   ├── BuildingClosedDay     # Building-specific closure dates
 │   │   ├── Lab                   # Lab entity
 │   │   ├── Workstation           # Individual workstation
 │   │   ├── LabManager            # User-Lab management junction
-│   │   ├── LabOperatingHours     # Per-day operating hours
-│   │   ├── LabClosedDay          # Specific closure dates
+│   │   ├── LabOperatingHours     # Lab per-day operating hours
+│   │   ├── LabClosedDay          # Lab-specific closure dates
+│   │   ├── SpecialOperatingHours # Date-specific operating hour overrides
 │   │   ├── Reservation           # Booking request
 │   │   ├── ReservationWorkstation# Reservation-Workstation junction
 │   │   ├── RecurringPattern      # Recurrence configuration
-│   │   ├── ReservationStatus     # PENDING/APPROVED/REJECTED/CANCELLED
+│   │   ├── ReservationEditProposal # Stores original/proposed values for edits
+│   │   ├── ReservationStatus     # PENDING/APPROVED/REJECTED/CANCELLED/PENDING_EDIT_APPROVAL
 │   │   └── RecurrenceType        # WEEKLY/BIWEEKLY/MONTHLY/CUSTOM
 │   │
 │   ├── repository/
 │   │   ├── BuildingRepository
+│   │   ├── BuildingOperatingHoursRepository
+│   │   ├── BuildingClosedDayRepository
 │   │   ├── LabRepository
 │   │   ├── WorkstationRepository
 │   │   ├── LabManagerRepository
 │   │   ├── LabOperatingHoursRepository
 │   │   ├── LabClosedDayRepository
+│   │   ├── SpecialOperatingHoursRepository
 │   │   ├── ReservationRepository
-│   │   └── RecurringPatternRepository
+│   │   ├── RecurringPatternRepository
+│   │   └── ReservationEditProposalRepository
 │   │
 │   ├── request/
 │   │   └── CreateReservationRequest  # Reservation creation DTO
@@ -705,10 +755,15 @@ com._glab.booking_system
 │   │   └── WorkstationResponse
 │   │
 │   └── service/
-│       ├── BuildingService       # Building operations
-│       ├── LabService            # Lab operations
-│       ├── AvailabilityService   # Availability calculations
-│       └── ReservationService    # Reservation logic & validation
+│       ├── BuildingService            # Building CRUD & operating hours
+│       ├── LabService                 # Lab CRUD, managers & operating hours
+│       ├── WorkstationService         # Workstation CRUD
+│       ├── DaysOffService             # University-wide days off management
+│       ├── AvailabilityService        # Availability calculations
+│       ├── ReservationService         # Reservation creation & validation
+│       ├── ReservationManagementService # Approve/decline reservations
+│       ├── ReservationEditService     # Edit proposal workflow
+│       └── LabManagerAuthorizationService # Authorization checks
 │
 ├── ErrorResponse                  # Global error format
 ├── ErrorResponseCode              # Error code enum
