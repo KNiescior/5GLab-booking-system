@@ -1,7 +1,15 @@
 package com._glab.booking_system.booking.service;
 
 import com._glab.booking_system.booking.model.*;
-import com._glab.booking_system.booking.repository.*;
+import com._glab.booking_system.booking.repository.BuildingClosedDayRepository;
+import com._glab.booking_system.booking.repository.BuildingOperatingHoursRepository;
+import com._glab.booking_system.booking.repository.LabClosedDayRepository;
+import com._glab.booking_system.booking.repository.LabOperatingHoursRepository;
+import com._glab.booking_system.booking.repository.LabRepository;
+import com._glab.booking_system.booking.repository.ReservationRepository;
+import com._glab.booking_system.booking.repository.ReservationWorkstationRepository;
+import com._glab.booking_system.booking.repository.SpecialOperatingHoursRepository;
+import com._glab.booking_system.booking.repository.WorkstationRepository;
 import com._glab.booking_system.booking.response.*;
 import com._glab.booking_system.user.model.Role;
 import com._glab.booking_system.user.model.RoleName;
@@ -40,7 +48,13 @@ class AvailabilityServiceTest {
     @Mock
     private LabOperatingHoursRepository operatingHoursRepository;
     @Mock
+    private BuildingOperatingHoursRepository buildingOperatingHoursRepository;
+    @Mock
     private LabClosedDayRepository closedDayRepository;
+    @Mock
+    private BuildingClosedDayRepository buildingClosedDayRepository;
+    @Mock
+    private SpecialOperatingHoursRepository specialOperatingHoursRepository;
     @Mock
     private ReservationRepository reservationRepository;
     @Mock
@@ -59,7 +73,10 @@ class AvailabilityServiceTest {
         availabilityService = new AvailabilityService(
                 labRepository,
                 operatingHoursRepository,
+                buildingOperatingHoursRepository,
                 closedDayRepository,
+                buildingClosedDayRepository,
+                specialOperatingHoursRepository,
                 reservationRepository,
                 reservationWorkstationRepository,
                 workstationRepository
