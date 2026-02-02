@@ -11,8 +11,11 @@ import com._glab.booking_system.auth.request.MfaSetupVerifyRequest;
 import com._glab.booking_system.auth.request.MfaVerifyRequest;
 import com._glab.booking_system.auth.response.LoginResponse;
 import com._glab.booking_system.auth.response.MfaChallengeResponse;
+import com._glab.booking_system.auth.response.MfaDisableResponse;
+import com._glab.booking_system.auth.response.MfaEmailCodeResponse;
 import com._glab.booking_system.auth.response.MfaSetupCompleteResponse;
 import com._glab.booking_system.auth.response.MfaSetupResponse;
+import com._glab.booking_system.auth.response.MfaStatusResponse;
 import com._glab.booking_system.auth.service.EmailOtpService;
 import com._glab.booking_system.auth.service.JwtService;
 import com._glab.booking_system.auth.service.MfaService;
@@ -36,7 +39,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Controller for MFA setup and verification endpoints.
@@ -229,7 +231,7 @@ public class MfaController {
      * Public endpoint - uses mfaToken for authentication.
      */
     @PostMapping("/email-code")
-    public ResponseEntity<Map<String, Object>> requestEmailCode(@RequestBody MfaEmailCodeRequest request) {
+    public ResponseEntity<MfaEmailCodeResponse> requestEmailCode(@RequestBody MfaEmailCodeRequest request) {
         String mfaToken = request.getMfaToken();
 
         MfaService.MfaTokenClaims claims;
@@ -247,18 +249,12 @@ public class MfaController {
 
         if (!sent) {
             log.debug("Email OTP rate-limited for user {}", user.getEmail());
-            return ResponseEntity.ok(Map.of(
-                    "sent", false,
-                    "message", "Please wait before requesting another code"
-            ));
+            return ResponseEntity.ok(new MfaEmailCodeResponse(false, "Please wait before requesting another code"));
         }
 
         log.info("Email OTP requested and sent to user {}", user.getEmail());
 
-        return ResponseEntity.ok(Map.of(
-                "sent", true,
-                "message", "Verification code sent to your email"
-        ));
+        return ResponseEntity.ok(new MfaEmailCodeResponse(true, "Verification code sent to your email"));
     }
 
     /**
@@ -266,7 +262,7 @@ public class MfaController {
      * Requires authentication and current TOTP code.
      */
     @PostMapping("/disable")
-    public ResponseEntity<Map<String, Object>> disableMfa(
+    public ResponseEntity<MfaDisableResponse> disableMfa(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody MfaDisableRequest request) {
 
@@ -300,10 +296,7 @@ public class MfaController {
 
         log.info("MFA disabled for user {}", user.getEmail());
 
-        return ResponseEntity.ok(Map.of(
-                "mfaEnabled", false,
-                "message", "MFA has been disabled"
-        ));
+        return ResponseEntity.ok(new MfaDisableResponse(false, "MFA has been disabled"));
     }
 
     /**
@@ -311,16 +304,16 @@ public class MfaController {
      * Requires authentication.
      */
     @GetMapping("/status")
-    public ResponseEntity<Map<String, Object>> getMfaStatus(@AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<MfaStatusResponse> getMfaStatus(@AuthenticationPrincipal UserDetails userDetails) {
         User user = userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new AuthenticationFailedException("User not found"));
 
         log.debug("MFA status check for user {}", user.getEmail());
 
-        return ResponseEntity.ok(Map.of(
-                "mfaEnabled", Boolean.TRUE.equals(user.getMfaEnabled()),
-                "mfaRequired", mfaService.isMfaRequired(user),
-                "canDisable", !mfaService.isMfaRequired(user)
+        return ResponseEntity.ok(new MfaStatusResponse(
+                Boolean.TRUE.equals(user.getMfaEnabled()),
+                mfaService.isMfaRequired(user),
+                !mfaService.isMfaRequired(user)
         ));
     }
 
