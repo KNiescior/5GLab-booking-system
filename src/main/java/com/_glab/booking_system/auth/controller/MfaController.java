@@ -5,6 +5,8 @@ import com._glab.booking_system.auth.exception.*;
 import com._glab.booking_system.auth.model.RefreshToken;
 import com._glab.booking_system.auth.repository.RefreshTokenRepository;
 import com._glab.booking_system.auth.request.MfaDisableRequest;
+import com._glab.booking_system.auth.request.MfaEmailCodeRequest;
+import com._glab.booking_system.auth.request.MfaSetupRequest;
 import com._glab.booking_system.auth.request.MfaSetupVerifyRequest;
 import com._glab.booking_system.auth.request.MfaVerifyRequest;
 import com._glab.booking_system.auth.response.LoginResponse;
@@ -62,9 +64,9 @@ public class MfaController {
     @PostMapping("/setup")
     public ResponseEntity<MfaSetupResponse> setupMfa(
             @AuthenticationPrincipal UserDetails userDetails,
-            @RequestBody(required = false) Map<String, String> request) {
+            @RequestBody(required = false) MfaSetupRequest request) {
         
-        User user = resolveUserForSetup(userDetails, request);
+        User user = resolveUserForSetup(userDetails, request != null ? request.getMfaToken() : null);
 
         if (Boolean.TRUE.equals(user.getMfaEnabled())) {
             log.warn("MFA setup attempt for user {} who already has MFA enabled", user.getEmail());
@@ -227,8 +229,8 @@ public class MfaController {
      * Public endpoint - uses mfaToken for authentication.
      */
     @PostMapping("/email-code")
-    public ResponseEntity<Map<String, Object>> requestEmailCode(@RequestBody Map<String, String> request) {
-        String mfaToken = request.get("mfaToken");
+    public ResponseEntity<Map<String, Object>> requestEmailCode(@RequestBody MfaEmailCodeRequest request) {
+        String mfaToken = request.getMfaToken();
 
         MfaService.MfaTokenClaims claims;
         try {
@@ -329,11 +331,6 @@ public class MfaController {
      * 1. Regular authentication (userDetails)
      * 2. MFA token in request body (for mandatory setup)
      */
-    private User resolveUserForSetup(UserDetails userDetails, Map<String, String> request) {
-        String mfaToken = request != null ? request.get("mfaToken") : null;
-        return resolveUserForSetup(userDetails, mfaToken);
-    }
-
     private User resolveUserForSetup(UserDetails userDetails, String mfaToken) {
         // Try regular authentication first
         if (userDetails != null) {
