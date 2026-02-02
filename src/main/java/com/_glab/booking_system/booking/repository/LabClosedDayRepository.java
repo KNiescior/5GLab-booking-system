@@ -16,6 +16,11 @@ public interface LabClosedDayRepository extends JpaRepository<LabClosedDay, Inte
     List<LabClosedDay> findByLabId(Integer labId);
 
     /**
+     * University-wide (global) days off: lab_id is null.
+     */
+    List<LabClosedDay> findByLabIsNull();
+
+    /**
      * Find all closures (specific dates) for a lab within a date range.
      */
     @Query("SELECT lcd FROM LabClosedDay lcd WHERE (lcd.lab.id = :labId OR lcd.lab IS NULL) " +

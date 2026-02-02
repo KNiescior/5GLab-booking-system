@@ -104,4 +104,21 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
      * Count pending reservations for a lab.
      */
     int countByLabIdAndStatus(Integer labId, ReservationStatus status);
+
+    /**
+     * Find reservations with optional filters for admin listing.
+     */
+    @Query("SELECT r FROM Reservation r WHERE " +
+           "(:status is null OR r.status = :status) AND " +
+           "(:labId is null OR r.lab.id = :labId) AND " +
+           "(:userId is null OR r.user.id = :userId) AND " +
+           "(:dateFrom is null OR r.startTime >= :dateFrom) AND " +
+           "(:dateTo is null OR r.endTime <= :dateTo) " +
+           "ORDER BY r.createdAt DESC")
+    List<Reservation> findForAdmin(
+            @Param("status") ReservationStatus status,
+            @Param("labId") Integer labId,
+            @Param("userId") Integer userId,
+            @Param("dateFrom") OffsetDateTime dateFrom,
+            @Param("dateTo") OffsetDateTime dateTo);
 }

@@ -25,6 +25,9 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found for email: " + email));
+        if (Boolean.TRUE.equals(user.getIsAnonymous())) {
+            throw new UsernameNotFoundException("Anonymous user cannot log in");
+        }
 
         boolean enabled = Boolean.TRUE.equals(user.getEnabled());
         boolean accountNonLocked = user.getLockedUntil() == null

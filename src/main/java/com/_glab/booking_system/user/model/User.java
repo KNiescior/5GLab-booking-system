@@ -46,6 +46,16 @@ public class User {
 
     private Boolean enabled = true;
 
+    /**
+     * When the account was deactivated (soft delete). Null if active.
+     */
+    private OffsetDateTime archivedAt;
+
+    /**
+     * System placeholder for deleted users. Cannot log in; used for FK references.
+     */
+    private Boolean isAnonymous = false;
+
     private Integer failedLoginCount = 0;
 
     private OffsetDateTime lockedUntil;

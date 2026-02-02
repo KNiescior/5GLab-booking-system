@@ -2,6 +2,9 @@ package com._glab.booking_system.booking.service;
 
 import com._glab.booking_system.auth.service.EmailService;
 import com._glab.booking_system.booking.exception.BookingNotAuthorizedException;
+import com._glab.booking_system.booking.exception.EditAlreadyResolvedException;
+import com._glab.booking_system.booking.exception.EditProposalNotFoundException;
+import com._glab.booking_system.booking.exception.InvalidEditException;
 import com._glab.booking_system.booking.exception.EditProposalNotFoundException;
 import com._glab.booking_system.booking.exception.ReservationNotFoundException;
 import com._glab.booking_system.booking.model.*;
@@ -228,7 +231,7 @@ class ReservationEditServiceTest {
         }
 
         @Test
-        @DisplayName("Should throw IllegalStateException when edit proposal already exists")
+        @DisplayName("Should throw EditAlreadyResolvedException when edit proposal already exists")
         void shouldThrowWhenEditProposalExists() {
             setUpValidationMocks();
             when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(pendingReservation));
@@ -237,7 +240,7 @@ class ReservationEditServiceTest {
                     .thenReturn(Optional.of(editProposal));
 
             assertThatThrownBy(() -> editService.editReservationByManager(reservationId, validEditRequest, labManagerUser))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(EditAlreadyResolvedException.class)
                     .hasMessageContaining("pending edit proposal");
         }
     }
@@ -417,7 +420,7 @@ class ReservationEditServiceTest {
         }
 
         @Test
-        @DisplayName("Should throw IllegalStateException for non-editable status")
+        @DisplayName("Should throw InvalidEditException for non-editable status")
         void shouldThrowForNonEditableStatus() {
             setUpValidationMocks();
             Reservation rejectedReservation = new Reservation();
@@ -430,7 +433,7 @@ class ReservationEditServiceTest {
             when(authorizationService.isReservationOwner(professorUser, rejectedReservation)).thenReturn(true);
 
             assertThatThrownBy(() -> editService.editReservationByProfessor(rejectedReservation.getId(), validEditRequest, professorUser))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(InvalidEditException.class)
                     .hasMessageContaining("PENDING or APPROVED");
         }
     }
@@ -467,7 +470,7 @@ class ReservationEditServiceTest {
         }
 
         @Test
-        @DisplayName("Should throw IllegalStateException when edit was made by owner (not lab manager)")
+        @DisplayName("Should throw InvalidEditException when edit was made by owner (not lab manager)")
         void shouldThrowWhenEditMadeByOwner() {
             // Professor made the edit (not lab manager)
             editProposal.setEditedBy(professorUser);
@@ -481,7 +484,7 @@ class ReservationEditServiceTest {
             when(authorizationService.isReservationOwner(professorUser, pendingReservation)).thenReturn(true);
 
             assertThatThrownBy(() -> editService.approveEditByProfessor(reservationId, professorUser))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(InvalidEditException.class)
                     .hasMessageContaining("not created by a lab manager");
         }
     }

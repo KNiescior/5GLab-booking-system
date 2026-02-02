@@ -13,5 +13,11 @@ public interface LabRepository extends JpaRepository<Lab, Integer> {
 
     List<Lab> findByBuildingId(Integer buildingId);
 
+    List<Lab> findByBuildingIdAndActiveTrue(Integer buildingId);
+
     Optional<Lab> findByBuildingAndName(Building building, String name);
+
+    List<Lab> findAllByActiveTrue();
+
+    Optional<Lab> findByIdAndActiveTrue(Integer id);
 }

@@ -1,3 +1,7 @@
+logging:
+  file:
+    name: ${LOG_FILE_PATH:${java.io.tmpdir}/booking-spring.log}
+
 spring:
   datasource:
     url: ${DB_URL}

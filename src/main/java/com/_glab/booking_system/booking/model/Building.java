@@ -35,6 +35,17 @@ public class Building {
 
     private String city;
 
+    /**
+     * If false, building is archived and excluded from default listings.
+     */
+    @Column(nullable = false)
+    private Boolean active = true;
+
+    /**
+     * When the building was archived (soft delete). Null if active.
+     */
+    private OffsetDateTime archivedAt;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
