@@ -278,7 +278,7 @@ class ReservationEditServiceTest {
         }
 
         @Test
-        @DisplayName("Should throw BookingNotAuthorizedException when edit was made by non-owner")
+        @DisplayName("Should throw IllegalStateException when edit was made by non-owner")
         void shouldThrowWhenEditNotByOwner() {
             // Lab manager made the edit (not the professor)
             editProposal.setEditedBy(labManagerUser);
@@ -291,7 +291,7 @@ class ReservationEditServiceTest {
             when(authorizationService.isReservationOwner(labManagerUser, pendingReservation)).thenReturn(false);
 
             assertThatThrownBy(() -> editService.approveEditByManager(reservationId, labManagerUser))
-                    .isInstanceOf(BookingNotAuthorizedException.class)
+                    .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("not created by the reservation owner");
         }
 
