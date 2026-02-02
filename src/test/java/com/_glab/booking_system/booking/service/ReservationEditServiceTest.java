@@ -291,7 +291,7 @@ class ReservationEditServiceTest {
             when(authorizationService.isReservationOwner(labManagerUser, pendingReservation)).thenReturn(false);
 
             assertThatThrownBy(() -> editService.approveEditByManager(reservationId, labManagerUser))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(InvalidEditException.class)
                     .hasMessageContaining("not created by the reservation owner");
         }
 

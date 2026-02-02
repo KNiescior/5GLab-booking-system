@@ -38,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -106,6 +107,13 @@ class AvailabilityServiceTest {
         testUser.setFirstName("Test");
         testUser.setLastName("Professor");
         testUser.setRole(professorRole);
+
+        // Lenient default stubs for building/special hours (used only in some tests)
+        lenient().when(buildingOperatingHoursRepository.findByBuildingId(anyInt())).thenReturn(List.of());
+        lenient().when(buildingOperatingHoursRepository.findByBuildingIdAndDayOfWeek(anyInt(), anyInt())).thenReturn(Optional.empty());
+        lenient().when(buildingClosedDayRepository.findByBuildingId(anyInt())).thenReturn(List.of());
+        lenient().when(specialOperatingHoursRepository.findByLabIdAndSpecificDate(anyInt(), any())).thenReturn(Optional.empty());
+        lenient().when(specialOperatingHoursRepository.findByBuildingIdAndSpecificDate(anyInt(), any())).thenReturn(Optional.empty());
     }
 
     @Nested

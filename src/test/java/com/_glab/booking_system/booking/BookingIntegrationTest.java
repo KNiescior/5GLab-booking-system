@@ -4,7 +4,17 @@ import com._glab.booking_system.auth.config.TestJwtConfig;
 import com._glab.booking_system.auth.config.TestMailConfig;
 import com._glab.booking_system.auth.service.JwtService;
 import com._glab.booking_system.booking.model.*;
-import com._glab.booking_system.booking.repository.*;
+import com._glab.booking_system.booking.repository.BuildingClosedDayRepository;
+import com._glab.booking_system.booking.repository.BuildingRepository;
+import com._glab.booking_system.booking.repository.BuildingOperatingHoursRepository;
+import com._glab.booking_system.booking.repository.LabClosedDayRepository;
+import com._glab.booking_system.booking.repository.LabManagerRepository;
+import com._glab.booking_system.booking.repository.LabOperatingHoursRepository;
+import com._glab.booking_system.booking.repository.LabRepository;
+import com._glab.booking_system.booking.repository.ReservationRepository;
+import com._glab.booking_system.booking.repository.ReservationWorkstationRepository;
+import com._glab.booking_system.booking.repository.SpecialOperatingHoursRepository;
+import com._glab.booking_system.booking.repository.WorkstationRepository;
 import com._glab.booking_system.booking.request.CreateReservationRequest;
 import com._glab.booking_system.user.model.Role;
 import com._glab.booking_system.user.model.RoleName;
@@ -71,7 +81,25 @@ class BookingIntegrationTest {
     private BuildingRepository buildingRepository;
 
     @Autowired
+    private BuildingOperatingHoursRepository buildingOperatingHoursRepository;
+
+    @Autowired
+    private BuildingClosedDayRepository buildingClosedDayRepository;
+
+    @Autowired
     private LabRepository labRepository;
+
+    @Autowired
+    private LabOperatingHoursRepository labOperatingHoursRepository;
+
+    @Autowired
+    private LabClosedDayRepository labClosedDayRepository;
+
+    @Autowired
+    private SpecialOperatingHoursRepository specialOperatingHoursRepository;
+
+    @Autowired
+    private LabManagerRepository labManagerRepository;
 
     @Autowired
     private WorkstationRepository workstationRepository;
@@ -102,7 +130,13 @@ class BookingIntegrationTest {
         reservationWorkstationRepository.deleteAll();
         reservationRepository.deleteAll();
         workstationRepository.deleteAll();
+        labManagerRepository.deleteAll();
+        specialOperatingHoursRepository.deleteAll();
+        labClosedDayRepository.deleteAll();
+        labOperatingHoursRepository.deleteAll();
         labRepository.deleteAll();
+        buildingClosedDayRepository.deleteAll();
+        buildingOperatingHoursRepository.deleteAll();
         buildingRepository.deleteAll();
         // Delete all users except the anonymous system user
         userRepository.findAll().stream()
