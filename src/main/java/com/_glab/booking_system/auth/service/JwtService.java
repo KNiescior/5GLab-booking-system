@@ -81,8 +81,8 @@ public class JwtService {
 			log.debug("JWT token expired: {}", e.getMessage());
 			throw new ExpiredJwtTokenException("JWT token expired", e);
 		} catch (JwtException e) {
-			log.debug("JWT token invalid: {}", e.getMessage());
-			throw new InvalidJwtException("JWT token is invalid", e);
+			log.warn("JWT token invalid - type: {}, message: {}", e.getClass().getSimpleName(), e.getMessage());
+			throw new InvalidJwtException("JWT token is invalid: " + e.getMessage(), e);
 		}
 	}
 

@@ -34,7 +34,7 @@ public class User {
     @Enumerated(EnumType.ORDINAL)
     private Degree degree;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "role_id")
     private Role role;
 

@@ -62,6 +62,35 @@ public class UserController {
     }
 
     /**
+     * Debug endpoint to check current authentication status.
+     * Returns the authorities/roles that Spring Security sees.
+     */
+    @GetMapping("/me/debug")
+    public ResponseEntity<Map<String, Object>> debugAuth(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.ok(Map.of(
+                    "authenticated", false,
+                    "message", "No authentication found"
+            ));
+        }
+        
+        User user = userRepository.findByEmail(userDetails.getUsername()).orElse(null);
+        String dbRole = user != null && user.getRole() != null 
+                ? user.getRole().getName().name() 
+                : "NO_ROLE_IN_DB";
+        
+        return ResponseEntity.ok(Map.of(
+                "authenticated", true,
+                "username", userDetails.getUsername(),
+                "authorities", userDetails.getAuthorities().stream()
+                        .map(Object::toString)
+                        .toList(),
+                "dbRole", dbRole,
+                "dbRoleId", user != null && user.getRole() != null ? user.getRole().getId() : "null"
+        ));
+    }
+
+    /**
      * Update current authenticated user's profile.
      */
     @PutMapping("/me")
