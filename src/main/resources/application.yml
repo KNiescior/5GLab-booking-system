@@ -25,6 +25,19 @@ app:
     from: ${MAIL_FROM:noreply@example.com}
   frontend:
     url: ${FRONTEND_URL:http://localhost:3000}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+    allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+    allowed-headers: "*"
+    allow-credentials: true
+    max-age: 3600
+  security:
+    csrf-enabled: ${CSRF_ENABLED:false}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    auth-requests-per-minute: ${RATE_LIMIT_AUTH:10}
+    public-requests-per-minute: ${RATE_LIMIT_PUBLIC:60}
+    authenticated-requests-per-minute: ${RATE_LIMIT_AUTHENTICATED:120}
 
 jwt:
   private-key-path: ${JWT_PRIVATE_KEY_PATH:classpath:keys/private.pem}
