@@ -25,9 +25,9 @@ This document tracks planned features and improvements for the 5GLab Booking Sys
 
 ## Technical Debt
 
-- [ ] **Production CORS** - Configure proper CORS origins before deployment
-- [ ] **CSRF** - Re-enable CSRF protection for browser clients
-- [ ] **Rate limiting** - Add rate limiting to public endpoints
+- [x] **Production CORS** - Configure proper CORS origins before deployment (via `CORS_ALLOWED_ORIGINS` env var)
+- [x] **CSRF** - Re-enable CSRF protection for browser clients (via `CSRF_ENABLED` env var)
+- [x] **Rate limiting** - Add rate limiting to public endpoints (via Bucket4j, configurable via `RATE_LIMIT_*` env vars)
 - [ ] **Delete DataInitializer.java** - Remove before production deployment
 - [ ] **Delete test users** - Remove admin@5glab.com and professor@5glab.com from production DB
 
