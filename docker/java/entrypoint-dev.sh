@@ -21,3 +21,29 @@ watch_and_compile &
 
 # Run the app (DevTools will restart when classes change)
 ./gradlew bootRun
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

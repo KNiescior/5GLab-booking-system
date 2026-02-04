@@ -38,10 +38,15 @@ public class Workstation {
     private String description;
 
     /**
-     * If false, workstation is disabled and cannot be booked.
+     * If false, workstation is archived and cannot be booked.
      */
     @Column(nullable = false)
     private Boolean active = true;
+
+    /**
+     * When the workstation was archived (soft delete). Null if active.
+     */
+    private OffsetDateTime archivedAt;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

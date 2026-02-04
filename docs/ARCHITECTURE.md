@@ -4,409 +4,352 @@ Technical architecture and design decisions for the 5GLab Booking System.
 
 ## Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                           Client Layer                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │
-│  │   Web App   │  │ Mobile App  │  │   Admin UI  │                  │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘                  │
-└─────────┼────────────────┼────────────────┼─────────────────────────┘
-          │                │                │
-          ▼                ▼                ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         API Gateway                                  │
-│                    (Spring Boot Application)                         │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │                    Security Filter Chain                      │   │
-│  │  ┌─────────────────┐  ┌─────────────────┐                    │   │
-│  │  │  CORS Filter    │→│  JWT Auth Filter │→ Controllers       │   │
-│  │  └─────────────────┘  └─────────────────┘                    │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-          │
-          ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Data Layer                                    │
-│  ┌─────────────────┐  ┌─────────────────┐                           │
-│  │   PostgreSQL    │  │  (Future: Redis │                           │
-│  │   Database      │  │   for caching)  │                           │
-│  └─────────────────┘  └─────────────────┘                           │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+---
+title: System Architecture Overview
+---
+flowchart TB
+    subgraph Client["Client Layer"]
+        WebApp["Web App"]
+        MobileApp["Mobile App"]
+        AdminUI["Admin UI"]
+    end
+
+    subgraph API["API Gateway (Spring Boot Application)"]
+        subgraph Security["Security Filter Chain"]
+            CORS["CORS Filter"] --> JWT["JWT Auth Filter"] --> Controllers
+        end
+    end
+
+    subgraph Data["Data Layer"]
+        PostgreSQL["PostgreSQL Database"]
+        Redis["(Future: Redis for caching)"]
+    end
+
+    WebApp --> API
+    MobileApp --> API
+    AdminUI --> API
+    API --> Data
 ```
 
 ## Authentication Flow
 
 ### Login Flow
 
-```
-┌────────┐      ┌─────────────┐      ┌───────────┐      ┌────────────┐
-│ Client │      │ LoginController│   │ UserRepo  │      │ JwtService │
-└───┬────┘      └──────┬──────┘      └─────┬─────┘      └─────┬──────┘
-    │                  │                   │                  │
-    │ POST /login      │                   │                  │
-    │ {email,password} │                   │                  │
-    │─────────────────>│                   │                  │
-    │                  │                   │                  │
-    │                  │ findByEmail()     │                  │
-    │                  │──────────────────>│                  │
-    │                  │                   │                  │
-    │                  │      User         │                  │
-    │                  │<──────────────────│                  │
-    │                  │                   │                  │
-    │                  │ Check: enabled?   │                  │
-    │                  │ Check: locked?    │                  │
-    │                  │ Verify password   │                  │
-    │                  │                   │                  │
-    │                  │ generateAccessToken()               │
-    │                  │─────────────────────────────────────>│
-    │                  │                                      │
-    │                  │ generateRefreshToken()              │
-    │                  │─────────────────────────────────────>│
-    │                  │                                      │
-    │                  │         tokens                       │
-    │                  │<─────────────────────────────────────│
-    │                  │                   │                  │
-    │ 200 OK           │                   │                  │
-    │ {accessToken}    │                   │                  │
-    │ Set-Cookie:      │                   │                  │
-    │ refreshToken=... │                   │                  │
-    │<─────────────────│                   │                  │
-    │                  │                   │                  │
+```mermaid
+sequenceDiagram
+    participant Client
+    participant LoginController
+    participant UserRepo
+    participant JwtService
+
+    Client->>LoginController: POST /login {email, password}
+    LoginController->>UserRepo: findByEmail()
+    UserRepo-->>LoginController: User
+    
+    Note over LoginController: Check: enabled?<br/>Check: locked?<br/>Verify password
+    
+    LoginController->>JwtService: generateAccessToken()
+    LoginController->>JwtService: generateRefreshToken()
+    JwtService-->>LoginController: tokens
+    
+    LoginController-->>Client: 200 OK {accessToken}<br/>Set-Cookie: refreshToken=...
 ```
 
 ### Token Refresh Flow
 
-```
-┌────────┐      ┌─────────────────┐      ┌──────────────┐
-│ Client │      │ LoginController │      │ RefreshToken │
-└───┬────┘      └────────┬────────┘      │  Repository  │
-    │                    │               └──────┬───────┘
-    │ POST /refresh      │                      │
-    │ Cookie: refresh... │                      │
-    │───────────────────>│                      │
-    │                    │                      │
-    │                    │ findByTokenId(jti)   │
-    │                    │─────────────────────>│
-    │                    │                      │
-    │                    │    RefreshToken      │
-    │                    │<─────────────────────│
-    │                    │                      │
-    │                    │ isActive()?          │
-    │                    │ - Check revoked      │
-    │                    │ - Check expired      │
-    │                    │                      │
-    │                    │ Generate new tokens  │
-    │                    │ Revoke old token     │
-    │                    │ Link old → new       │
-    │                    │                      │
-    │ 200 OK             │                      │
-    │ {newAccessToken}   │                      │
-    │ Set-Cookie: new... │                      │
-    │<───────────────────│                      │
+```mermaid
+sequenceDiagram
+    participant Client
+    participant LoginController
+    participant RefreshTokenRepository
+
+    Client->>LoginController: POST /refresh<br/>Cookie: refresh...
+    LoginController->>RefreshTokenRepository: findByTokenId(jti)
+    RefreshTokenRepository-->>LoginController: RefreshToken
+    
+    Note over LoginController: isActive()?<br/>- Check revoked<br/>- Check expired
+    Note over LoginController: Generate new tokens<br/>Revoke old token<br/>Link old → new
+    
+    LoginController-->>Client: 200 OK {newAccessToken}<br/>Set-Cookie: new...
 ```
 
 ### MFA Login Flow
 
 When MFA is enabled for a user:
 
-```
-┌────────┐      ┌─────────────┐      ┌───────────┐      ┌────────────┐
-│ Client │      │ LoginController│   │ MfaService│      │ MfaController│
-└───┬────┘      └──────┬──────┘      └─────┬─────┘      └─────┬──────┘
-    │                  │                   │                  │
-    │ POST /login      │                   │                  │
-    │ {email,password} │                   │                  │
-    │─────────────────>│                   │                  │
-    │                  │                   │                  │
-    │                  │ Verify password   │                  │
-    │                  │ (success)         │                  │
-    │                  │                   │                  │
-    │                  │ Check MFA enabled?│                  │
-    │                  │──────────────────>│                  │
-    │                  │                   │                  │
-    │                  │    mfaEnabled=true│                  │
-    │                  │<──────────────────│                  │
-    │                  │                   │                  │
-    │                  │ generateMfaToken()│                  │
-    │                  │──────────────────>│                  │
-    │                  │                   │                  │
-    │ 200 OK           │                   │                  │
-    │ {mfaToken}       │                   │                  │
-    │<─────────────────│                   │                  │
-    │                  │                   │                  │
-    │                  │                   │                  │
-    │ POST /mfa/verify │                   │                  │
-    │ {mfaToken, code} │                   │                  │
-    │────────────────────────────────────────────────────────>│
-    │                  │                   │                  │
-    │                  │                   │  parseMfaToken() │
-    │                  │                   │<─────────────────│
-    │                  │                   │                  │
-    │                  │                   │  verifyTotp()    │
-    │                  │                   │<─────────────────│
-    │                  │                   │                  │
-    │ 200 OK           │                   │                  │
-    │ {accessToken}    │                   │                  │
-    │ Set-Cookie:      │                   │                  │
-    │ refreshToken=... │                   │                  │
-    │<────────────────────────────────────────────────────────│
+```mermaid
+sequenceDiagram
+    participant Client
+    participant LoginController
+    participant MfaService
+    participant MfaController
+
+    Client->>LoginController: POST /login {email, password}
+    Note over LoginController: Verify password (success)
+    
+    LoginController->>MfaService: Check MFA enabled?
+    MfaService-->>LoginController: mfaEnabled=true
+    
+    LoginController->>MfaService: generateMfaToken()
+    LoginController-->>Client: 200 OK {mfaToken}
+    
+    Client->>MfaController: POST /mfa/verify {mfaToken, code}
+    MfaController->>MfaService: parseMfaToken()
+    MfaController->>MfaService: verifyTotp()
+    
+    MfaController-->>Client: 200 OK {accessToken}<br/>Set-Cookie: refreshToken=...
 ```
 
 ### MFA Setup Flow
 
-```
-┌────────┐      ┌──────────────┐      ┌───────────┐
-│ Client │      │ MfaController │      │ MfaService│
-└───┬────┘      └──────┬───────┘      └─────┬─────┘
-    │                  │                    │
-    │ POST /mfa/setup  │                    │
-    │ (with Bearer)    │                    │
-    │─────────────────>│                    │
-    │                  │                    │
-    │                  │ generateSecret()   │
-    │                  │───────────────────>│
-    │                  │                    │
-    │                  │ generateQrCode()   │
-    │                  │───────────────────>│
-    │                  │                    │
-    │ 200 OK           │                    │
-    │ {secret, qrCode} │                    │
-    │<─────────────────│                    │
-    │                  │                    │
-    │ (User scans QR)  │                    │
-    │                  │                    │
-    │ POST /setup/verify                    │
-    │ {secret, code}   │                    │
-    │─────────────────>│                    │
-    │                  │                    │
-    │                  │ verifyTotp()       │
-    │                  │───────────────────>│
-    │                  │                    │
-    │                  │ generateBackupCodes│
-    │                  │───────────────────>│
-    │                  │                    │
-    │ 200 OK           │                    │
-    │ {backupCodes}    │                    │
-    │<─────────────────│                    │
+```mermaid
+sequenceDiagram
+    participant Client
+    participant MfaController
+    participant MfaService
+
+    Client->>MfaController: POST /mfa/setup (with Bearer)
+    MfaController->>MfaService: generateSecret()
+    MfaController->>MfaService: generateQrCode()
+    MfaController-->>Client: 200 OK {secret, qrCode}
+    
+    Note over Client: User scans QR
+    
+    Client->>MfaController: POST /setup/verify {secret, code}
+    MfaController->>MfaService: verifyTotp()
+    MfaController->>MfaService: generateBackupCodes()
+    MfaController-->>Client: 200 OK {backupCodes}
 ```
 
 ### User Registration Flow (Admin Only)
 
-```
-┌────────┐      ┌────────────────┐      ┌───────────┐      ┌────────────┐
-│ Admin  │      │ UserController │      │UserService│      │EmailService│
-└───┬────┘      └───────┬────────┘      └─────┬─────┘      └─────┬──────┘
-    │                   │                     │                  │
-    │ POST /users       │                     │                  │
-    │ {email,username,  │                     │                  │
-    │  firstName,...}   │                     │                  │
-    │──────────────────>│                     │                  │
-    │                   │                     │                  │
-    │                   │ @PreAuthorize(ADMIN)│                  │
-    │                   │                     │                  │
-    │                   │ registerUser()      │                  │
-    │                   │────────────────────>│                  │
-    │                   │                     │                  │
-    │                   │    Validate email   │                  │
-    │                   │    Validate username│                  │
-    │                   │    Create User      │                  │
-    │                   │    (enabled=false)  │                  │
-    │                   │                     │                  │
-    │                   │    Generate token   │                  │
-    │                   │    (48h expiry)     │                  │
-    │                   │                     │                  │
-    │                   │                     │ sendSetupEmail() │
-    │                   │                     │─────────────────>│
-    │                   │                     │                  │
-    │                   │                     │          Email   │
-    │                   │                     │          with    │
-    │                   │                     │          link    │
-    │                   │                     │      ──────────> │ User
-    │                   │                     │                  │
-    │ 201 Created       │                     │                  │
-    │ {id, email, ...}  │                     │                  │
-    │<──────────────────│                     │                  │
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant UserController
+    participant UserService
+    participant EmailService
+    participant User
+
+    Admin->>UserController: POST /users {email, username, firstName, ...}
+    Note over UserController: @PreAuthorize(ADMIN)
+    
+    UserController->>UserService: registerUser()
+    Note over UserService: Validate email<br/>Validate username<br/>Create User (enabled=false)<br/>Generate token (48h expiry)
+    
+    UserService->>EmailService: sendSetupEmail()
+    EmailService-->>User: Email with setup link
+    
+    UserController-->>Admin: 201 Created {id, email, ...}
 ```
 
 ### Token Reuse Detection
 
 When a refresh token is used after it has been rotated:
 
-```
-┌────────┐      ┌─────────────────┐      ┌──────────────┐
-│Attacker│      │ LoginController │      │ RefreshToken │
-└───┬────┘      └────────┬────────┘      │  Repository  │
-    │                    │               └──────┬───────┘
-    │ POST /refresh      │                      │
-    │ Cookie: OLD_TOKEN  │                      │
-    │───────────────────>│                      │
-    │                    │                      │
-    │                    │ findByTokenId(jti)   │
-    │                    │─────────────────────>│
-    │                    │                      │
-    │                    │    RefreshToken      │
-    │                    │    {                 │
-    │                    │      revokedAt: X,   │
-    │                    │      replacedBy: Y   │  ← Already rotated!
-    │                    │    }                 │
-    │                    │<─────────────────────│
-    │                    │                      │
-    │                    │ SECURITY ALERT!      │
-    │                    │ Log incident         │
-    │                    │                      │
-    │ 401 Unauthorized   │                      │
-    │ TOKEN_REUSE_DETECT │                      │
-    │<───────────────────│                      │
+```mermaid
+sequenceDiagram
+    participant Attacker
+    participant LoginController
+    participant RefreshTokenRepository
+
+    Attacker->>LoginController: POST /refresh<br/>Cookie: OLD_TOKEN
+    LoginController->>RefreshTokenRepository: findByTokenId(jti)
+    RefreshTokenRepository-->>LoginController: RefreshToken {revokedAt: X, replacedBy: Y}
+    
+    Note over LoginController: ⚠️ Already rotated!<br/>SECURITY ALERT!<br/>Log incident
+    
+    LoginController-->>Attacker: 401 Unauthorized<br/>TOKEN_REUSE_DETECTED
 ```
 
 ## Database Schema
 
 ### User & Authentication Entities
 
-```
-┌─────────────────────┐       ┌─────────────────────┐
-│       account       │       │        role         │
-├─────────────────────┤       ├─────────────────────┤
-│ id (PK)             │       │ id (PK)             │
-│ username            │       │ name                │
-│ email               │       └──────────┬──────────┘
-│ password            │                  │
-│ first_name          │                  │
-│ last_name           │                  │
-│ degree              │                  │
-│ role_id (FK)────────┼──────────────────┘
-│ enabled             │
-│ failed_login_count  │
-│ locked_until        │
-│ last_login          │
-│ last_login_ip       │
-│ mfa_enabled         │
-│ totp_secret         │
-│ password_changed_at │
-│ created_timestamp   │
-│ last_modified       │
-└──────────┬──────────┘
-           │
-           │ 1:N
-           ▼
-┌─────────────────────┐
-│   refresh_token     │
-├─────────────────────┤
-│ id (PK)             │
-│ token_id (unique)   │
-│ user_id (FK)        │
-│ expires_at          │
-│ revoked_at          │
-│ replaced_by_token_id│
-│ created_at          │
-└─────────────────────┘
+```mermaid
+erDiagram
+    role {
+        int id PK
+        string name
+    }
 
-┌─────────────────────┐
-│ password_setup_token│
-├─────────────────────┤
-│ id (PK)             │
-│ token_hash (unique) │
-│ user_id (FK)        │
-│ purpose             │
-│ expires_at          │
-│ used_at             │
-│ created_at          │
-└─────────────────────┘
+    account {
+        int id PK
+        string username
+        string email
+        string password
+        string first_name
+        string last_name
+        string degree
+        int role_id FK
+        boolean enabled
+        int failed_login_count
+        datetime locked_until
+        datetime last_login
+        string last_login_ip
+        boolean mfa_enabled
+        string totp_secret
+        datetime password_changed_at
+        datetime created_timestamp
+        datetime last_modified
+    }
 
-┌─────────────────────┐
-│     email_otp       │
-├─────────────────────┤
-│ id (PK)             │
-│ user_id (FK)        │
-│ code_hash           │
-│ expires_at          │
-│ used_at             │
-│ created_at          │
-└─────────────────────┘
+    refresh_token {
+        int id PK
+        string token_id UK
+        int user_id FK
+        datetime expires_at
+        datetime revoked_at
+        string replaced_by_token_id
+        datetime created_at
+    }
+
+    password_setup_token {
+        int id PK
+        string token_hash UK
+        int user_id FK
+        string purpose
+        datetime expires_at
+        datetime used_at
+        datetime created_at
+    }
+
+    email_otp {
+        int id PK
+        int user_id FK
+        string code_hash
+        datetime expires_at
+        datetime used_at
+        datetime created_at
+    }
+
+    role ||--o{ account : "has"
+    account ||--o{ refresh_token : "has"
+    account ||--o{ password_setup_token : "has"
+    account ||--o{ email_otp : "has"
 ```
 
 ### Booking Entities
 
-```
-┌─────────────────────┐       ┌─────────────────────┐
-│      building       │       │         lab         │
-├─────────────────────┤       ├─────────────────────┤
-│ id (PK)             │◄──────│ id (PK)             │
-│ name                │       │ building_id (FK)    │
-│ description         │       │ name                │
-│ address             │       │ description         │
-│ city                │       │ capacity            │
-│ created_at          │       │ default_open_time   │
-│ last_modified_at    │       │ default_close_time  │
-└─────────────────────┘       │ created_at          │
-                              │ last_modified_at    │
-                              └──────────┬──────────┘
-                                         │
-           ┌─────────────────────────────┼─────────────────────────────┐
-           │                             │                             │
-           ▼                             ▼                             ▼
-┌─────────────────────┐       ┌─────────────────────┐       ┌─────────────────────┐
-│    workstation      │       │ lab_operating_hours │       │   lab_closed_day    │
-├─────────────────────┤       ├─────────────────────┤       ├─────────────────────┤
-│ id (PK)             │       │ id (PK)             │       │ id (PK)             │
-│ lab_id (FK)         │       │ lab_id (FK)         │       │ lab_id (FK)         │
-│ identifier          │       │ day_of_week         │       │ specific_date       │
-│ description         │       │ open_time           │       │ recurring_day       │
-│ active              │       │ close_time          │       │ reason              │
-│ created_at          │       │ is_closed           │       └─────────────────────┘
-└─────────────────────┘       └─────────────────────┘
+```mermaid
+erDiagram
+    building {
+        int id PK
+        string name
+        string description
+        string address
+        string city
+        datetime created_at
+        datetime last_modified_at
+    }
 
-┌─────────────────────┐       ┌─────────────────────┐
-│     lab_manager     │       │     reservation     │
-├─────────────────────┤       ├─────────────────────┤
-│ id (PK)             │       │ id (UUID PK)        │
-│ user_id (FK)        │       │ user_id (FK)        │
-│ lab_id (FK)         │       │ lab_id (FK)         │
-│ is_primary          │       │ start_time          │
-│ assigned_at         │       │ end_time            │
-└─────────────────────┘       │ description         │
-                              │ status              │
-                              │ whole_lab           │
-                              │ recurring_group_id  │
-                              │ created_at          │
-                              └──────────┬──────────┘
-                                         │
-           ┌─────────────────────────────┴─────────────────────────────┐
-           │                                                           │
-           ▼                                                           ▼
-┌─────────────────────────┐                             ┌─────────────────────────┐
-│ reservation_workstation │                             │   recurring_pattern     │
-├─────────────────────────┤                             ├─────────────────────────┤
-│ reservation_id (FK, PK) │                             │ id (UUID PK)            │
-│ workstation_id (FK, PK) │                             │ reservation_id (FK)     │
-└─────────────────────────┘                             │ pattern_type            │
-                                                        │ interval_days           │
-                                                        │ end_date                │
-                                                        │ occurrences             │
-                                                        └─────────────────────────┘
+    lab {
+        int id PK
+        int building_id FK
+        string name
+        string description
+        int capacity
+        time default_open_time
+        time default_close_time
+        datetime created_at
+        datetime last_modified_at
+    }
 
-┌───────────────────────────────┐
-│   reservation_edit_proposal   │
-├───────────────────────────────┤
-│ id (UUID PK)                  │
-│ reservation_id (FK)           │
-│ edited_by (FK → account)      │
-│ original_status               │
-│ original_start_time           │
-│ original_end_time             │
-│ original_description          │
-│ original_whole_lab            │
-│ original_workstation_ids      │  ← JSON column
-│ proposed_start_time           │
-│ proposed_end_time             │
-│ proposed_description          │
-│ proposed_whole_lab            │
-│ proposed_workstation_ids      │  ← JSON column
-│ resolution                    │  ← PENDING/APPROVED/REJECTED
-│ resolved_by (FK → account)    │
-│ resolved_at                   │
-│ created_at                    │
-└───────────────────────────────┘
+    workstation {
+        int id PK
+        int lab_id FK
+        string identifier
+        string description
+        boolean active
+        datetime created_at
+    }
+
+    lab_operating_hours {
+        int id PK
+        int lab_id FK
+        int day_of_week
+        time open_time
+        time close_time
+        boolean is_closed
+    }
+
+    lab_closed_day {
+        int id PK
+        int lab_id FK
+        date specific_date
+        int recurring_day
+        string reason
+    }
+
+    lab_manager {
+        int id PK
+        int user_id FK
+        int lab_id FK
+        boolean is_primary
+        datetime assigned_at
+    }
+
+    reservation {
+        uuid id PK
+        int user_id FK
+        int lab_id FK
+        datetime start_time
+        datetime end_time
+        string description
+        string status
+        boolean whole_lab
+        uuid recurring_group_id
+        datetime created_at
+    }
+
+    reservation_workstation {
+        uuid reservation_id PK_FK
+        int workstation_id PK_FK
+    }
+
+    recurring_pattern {
+        uuid id PK
+        uuid reservation_id FK
+        string pattern_type
+        int interval_days
+        date end_date
+        int occurrences
+    }
+
+    reservation_edit_proposal {
+        uuid id PK
+        uuid reservation_id FK
+        int edited_by FK "account"
+        string original_status
+        datetime original_start_time
+        datetime original_end_time
+        string original_description
+        boolean original_whole_lab
+        json original_workstation_ids
+        datetime proposed_start_time
+        datetime proposed_end_time
+        string proposed_description
+        boolean proposed_whole_lab
+        json proposed_workstation_ids
+        string resolution "PENDING/APPROVED/REJECTED"
+        int resolved_by FK "account"
+        datetime resolved_at
+        datetime created_at
+    }
+
+    building ||--o{ lab : "contains"
+    lab ||--o{ workstation : "has"
+    lab ||--o{ lab_operating_hours : "has"
+    lab ||--o{ lab_closed_day : "has"
+    lab ||--o{ lab_manager : "managed by"
+    lab ||--o{ reservation : "has"
+    account ||--o{ lab_manager : "is"
+    account ||--o{ reservation : "makes"
+    reservation ||--o{ reservation_workstation : "includes"
+    workstation ||--o{ reservation_workstation : "reserved in"
+    reservation ||--o| recurring_pattern : "has"
+    reservation ||--o{ reservation_edit_proposal : "has"
 ```
 
 ### Booking Enums
@@ -459,54 +402,49 @@ public enum RecurrenceType {
 
 ### Key Management
 
-```
-┌──────────────────────────────────────────┐
-│           JwtKeyProvider                  │
-├──────────────────────────────────────────┤
-│ - Loads RSA keys from filesystem         │
-│ - Supports classpath or absolute paths   │
-│ - Validates key format on startup        │
-│                                          │
-│ Private Key: Sign tokens                 │
-│ Public Key: Verify tokens                │
-└──────────────────────────────────────────┘
+```mermaid
+classDiagram
+    class JwtKeyProvider {
+        -PrivateKey privateKey
+        -PublicKey publicKey
+        +loadKeys() void
+        +getPrivateKey() PrivateKey
+        +getPublicKey() PublicKey
+    }
+    note for JwtKeyProvider "- Loads RSA keys from filesystem\n- Supports classpath or absolute paths\n- Validates key format on startup\n\nPrivate Key: Sign tokens\nPublic Key: Verify tokens"
 ```
 
 ### Security Filter Chain
 
-```
-Request
-   │
-   ▼
-┌─────────────────────┐
-│    CORS Filter      │  ← Cross-origin configuration
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│   CSRF Disabled     │  ← Stateless API (JWT-based)
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│ JwtAuthFilter       │  ← Extract & validate JWT
-│ - Extract from      │
-│   Authorization     │
-│   header            │
-│ - Validate token    │
-│ - Set Security      │
-│   Context           │
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│ Authorization       │  ← Role-based access
-│ - /auth/** permitAll│
-│ - /** authenticated │
-└──────────┬──────────┘
-           │
-           ▼
-     Controller
+```mermaid
+flowchart TB
+    Request([Request])
+    
+    Request --> CORS
+    
+    subgraph CORS["CORS Filter"]
+        cors_note["Cross-origin configuration"]
+    end
+    
+    CORS --> CSRF
+    
+    subgraph CSRF["CSRF Disabled"]
+        csrf_note["Stateless API (JWT-based)"]
+    end
+    
+    CSRF --> JWT
+    
+    subgraph JWT["JwtAuthFilter"]
+        jwt_note["- Extract from Authorization header\n- Validate token\n- Set Security Context"]
+    end
+    
+    JWT --> Auth
+    
+    subgraph Auth["Authorization"]
+        auth_note["- /auth/** permitAll\n- /** authenticated"]
+    end
+    
+    Auth --> Controller([Controller])
 ```
 
 ## Lockout Policy Implementation
@@ -533,39 +471,27 @@ if (successfulLogin) {
 
 ### State Diagram
 
-```
-                    ┌──────────────┐
-                    │   ACTIVE     │
-                    │ failed = 0   │
-                    └──────┬───────┘
-                           │
-              Failed Login │
-                           ▼
-                    ┌──────────────┐
-                    │   WARNING    │
-                    │ failed = 1-2 │
-                    └──────┬───────┘
-                           │
-              3rd Failed   │
-                           ▼
-                    ┌──────────────┐
-                    │   LOCKED     │◄────────────────┐
-                    │   10 min     │                 │
-                    └──────┬───────┘                 │
-                           │                         │
-              Timeout      │         6th Failed      │
-                           ▼                         │
-                    ┌──────────────┐                 │
-                    │  UNLOCKED    │─────────────────┘
-                    │ failed = 3-5 │
-                    └──────┬───────┘
-                           │
-              6th Failed   │
-                           ▼
-                    ┌──────────────┐
-                    │   LOCKED     │
-                    │   30 min     │
-                    └──────────────┘
+```mermaid
+---
+title: Account Lockout State Machine
+---
+stateDiagram-v2
+    [*] --> ACTIVE
+    
+    ACTIVE: failed = 0
+    WARNING: failed = 1-2
+    LOCKED_10: LOCKED (10 min)<br/>failed = 3-5
+    LOCKED_30: LOCKED (30 min)<br/>failed ≥ 6
+    
+    ACTIVE --> WARNING: Failed Login
+    WARNING --> WARNING: Failed Login (count < 3)
+    WARNING --> LOCKED_10: 3rd Failed
+    LOCKED_10 --> ACTIVE: Timeout (counter resets to 0)
+    LOCKED_10 --> LOCKED_30: 6th Failed (before timeout)
+    LOCKED_30 --> ACTIVE: Timeout (counter resets to 0)
+    
+    ACTIVE --> ACTIVE: Successful Login
+    WARNING --> ACTIVE: Successful Login (counter resets)
 ```
 
 ## Module Structure
@@ -880,69 +806,41 @@ A short-lived JWT (5 minutes) issued after password verification:
 
 ### Booking Flow
 
-```
-┌────────┐      ┌─────────────────────┐      ┌────────────────────┐
-│ User   │      │ ReservationController│     │ ReservationService │
-└───┬────┘      └──────────┬──────────┘      └─────────┬──────────┘
-    │                      │                           │
-    │ POST /reservations   │                           │
-    │ {labId, startTime,   │                           │
-    │  endTime, ...}       │                           │
-    │─────────────────────>│                           │
-    │                      │                           │
-    │                      │ createReservation()       │
-    │                      │──────────────────────────>│
-    │                      │                           │
-    │                      │   Validate:               │
-    │                      │   - Time range valid      │
-    │                      │   - Within operating hrs  │
-    │                      │   - Lab not closed        │
-    │                      │   - Workstations exist    │
-    │                      │   - Workstations active   │
-    │                      │                           │
-    │                      │   Create Reservation      │
-    │                      │   (status=PENDING)        │
-    │                      │                           │
-    │                      │   Send emails:            │
-    │                      │   - Confirmation to user  │
-    │                      │   - Notification to       │
-    │                      │     lab manager(s)        │
-    │                      │                           │
-    │                      │      ReservationResponse  │
-    │                      │<──────────────────────────│
-    │                      │                           │
-    │ 201 Created          │                           │
-    │ {id, status:PENDING} │                           │
-    │<─────────────────────│                           │
+```mermaid
+sequenceDiagram
+    participant User
+    participant ReservationController
+    participant ReservationService
+
+    User->>ReservationController: POST /reservations<br/>{labId, startTime, endTime, ...}
+    ReservationController->>ReservationService: createReservation()
+    
+    Note over ReservationService: Validate:<br/>- Time range valid<br/>- Within operating hrs<br/>- Lab not closed<br/>- Workstations exist<br/>- Workstations active
+    Note over ReservationService: Create Reservation<br/>(status=PENDING)
+    Note over ReservationService: Send emails:<br/>- Confirmation to user<br/>- Notification to lab manager(s)
+    
+    ReservationService-->>ReservationController: ReservationResponse
+    ReservationController-->>User: 201 Created {id, status:PENDING}
 ```
 
 ### Recurring Reservation Flow
 
-```
-┌────────┐                                    ┌────────────────────┐
-│ User   │                                    │ ReservationService │
-└───┬────┘                                    └─────────┬──────────┘
-    │                                                   │
-    │ POST /reservations                                │
-    │ {..., recurring: {patternType: WEEKLY,            │
-    │                   endDate: "2026-03-20"}}         │
-    │──────────────────────────────────────────────────>│
-    │                                                   │
-    │                       Generate recurring_group_id │
-    │                       (UUID)                      │
-    │                                                   │
-    │                       For each occurrence date:   │
-    │                       ├─ Skip if lab closed       │
-    │                       ├─ Skip if outside hours    │
-    │                       └─ Create Reservation       │
-    │                          (linked by group_id)     │
-    │                                                   │
-    │                       Send emails once for group  │
-    │                                                   │
-    │ 201 Created                                       │
-    │ {recurringGroupId, totalOccurrences,              │
-    │  reservations: [...]}                             │
-    │<──────────────────────────────────────────────────│
+```mermaid
+sequenceDiagram
+    participant User
+    participant ReservationService
+
+    User->>ReservationService: POST /reservations<br/>{..., recurring: {patternType: WEEKLY, endDate: "2026-03-20"}}
+    
+    Note over ReservationService: Generate recurring_group_id (UUID)
+    
+    loop For each occurrence date
+        Note over ReservationService: Skip if lab closed<br/>Skip if outside hours<br/>Create Reservation (linked by group_id)
+    end
+    
+    Note over ReservationService: Send emails once for group
+    
+    ReservationService-->>User: 201 Created<br/>{recurringGroupId, totalOccurrences, reservations: [...]}
 ```
 
 ---

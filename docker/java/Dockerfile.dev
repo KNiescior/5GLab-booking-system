@@ -26,3 +26,27 @@ watch_and_compile &\n\
 ./gradlew bootRun\n' > /entrypoint-dev.sh && chmod +x /entrypoint-dev.sh
 
 ENTRYPOINT ["/entrypoint-dev.sh"]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

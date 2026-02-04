@@ -4,6 +4,12 @@ This document tracks planned features and improvements for the 5GLab Booking Sys
 
 ## Medium Priority (Enhancements)
 
+### Authentication
+- [ ] **Change password endpoint** - Allow authenticated users to change their password (old → new)
+  - Endpoint: `POST /api/v1/auth/change-password`
+  - Requires: current password verification, new password validation
+  - Update `passwordChangedAt` timestamp
+
 ### Reminder System
 - [ ] **8am reminder emails** - Send reminder email at 8am on the day of user's reservation
   - Requires: Spring `@Scheduled` task
@@ -30,6 +36,7 @@ This document tracks planned features and improvements for the 5GLab Booking Sys
 - [x] **Rate limiting** - Add rate limiting to public endpoints (via Bucket4j, configurable via `RATE_LIMIT_*` env vars)
 - [ ] **Delete DataInitializer.java** - Remove before production deployment
 - [ ] **Delete test users** - Remove admin@5glab.com and professor@5glab.com from production DB
+- [ ] **LabService tests** - Add unit tests for `LabService` (CRUD, operating hours, manager assignment)
 
 ## Completed ✅
 
