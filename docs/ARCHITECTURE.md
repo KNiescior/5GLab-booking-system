@@ -453,6 +453,15 @@ flowchart TB
 
 ```java
 // Pseudocode
+if (lockoutExpired) {
+    if (failedCount >= 6) {
+        // Only reset after 30-min lockout
+        failedCount = 0;
+    }
+    // Clear lockout but keep count for escalation
+    lockUntil = null;
+}
+
 if (passwordMismatch) {
     failedCount++;
     
@@ -486,8 +495,8 @@ stateDiagram-v2
     ACTIVE --> WARNING: Failed Login
     WARNING --> WARNING: Failed Login (count < 3)
     WARNING --> LOCKED_10: 3rd Failed
-    LOCKED_10 --> ACTIVE: Timeout (counter resets to 0)
-    LOCKED_10 --> LOCKED_30: 6th Failed (before timeout)
+    LOCKED_10 --> WARNING: Timeout (counter kept for escalation)
+    WARNING --> LOCKED_30: 6th Failed
     LOCKED_30 --> ACTIVE: Timeout (counter resets to 0)
     
     ACTIVE --> ACTIVE: Successful Login

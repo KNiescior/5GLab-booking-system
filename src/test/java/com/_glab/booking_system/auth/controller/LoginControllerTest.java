@@ -278,9 +278,9 @@ class LoginControllerTest {
         }
 
         @Test
-        @DisplayName("Should reset failed count when lockout expires")
-        void shouldResetCountWhenLockoutExpires() {
-            // Lockout expired 1 minute ago
+        @DisplayName("Should reset failed count when 30-min lockout expires")
+        void shouldResetCountWhen30MinLockoutExpires() {
+            // 30-min lockout expired 1 minute ago (failed count was 6)
             testUser.setLockedUntil(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1));
             testUser.setFailedLoginCount(6);
             LoginRequest request = new LoginRequest("test@example.com", "password");
@@ -300,9 +300,9 @@ class LoginControllerTest {
         }
 
         @Test
-        @DisplayName("Should start fresh lockout tier after lockout expires and new failure")
-        void shouldStartFreshTierAfterExpiredLockout() {
-            // Lockout expired
+        @DisplayName("Should start fresh lockout tier after 30-min lockout expires and new failure")
+        void shouldStartFreshTierAfter30MinLockoutExpired() {
+            // 30-min lockout expired (failed count was 6)
             testUser.setLockedUntil(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1));
             testUser.setFailedLoginCount(6);
             LoginRequest request = new LoginRequest("test@example.com", "wrongpassword");
@@ -319,6 +319,76 @@ class LoginControllerTest {
             // No lockout yet (only 1 failure)
             assertThat(userCaptor.getValue().getLockedUntil()).isNull();
         }
+
+        @Test
+        @DisplayName("Should NOT reset failed count after 10-min lockout expires")
+        void shouldNotResetCountAfter10MinLockoutExpires() {
+            // 10-min lockout expired (failed count was 3)
+            testUser.setLockedUntil(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1));
+            testUser.setFailedLoginCount(3);
+            LoginRequest request = new LoginRequest("test@example.com", "password");
+            when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+            when(passwordEncoder.matches("password", "encodedPassword")).thenReturn(true);
+            when(jwtService.generateAccessToken(testUser)).thenReturn("access-token");
+            when(jwtService.generateRefreshToken(testUser)).thenReturn(
+                    new JwtService.RefreshTokenResult("refresh-token", "jti-123", new Date())
+            );
+
+            loginController.loginUser(request, httpRequest, httpResponse);
+
+            ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+            verify(userRepository).save(userCaptor.capture());
+            // Successful login resets counter
+            assertThat(userCaptor.getValue().getFailedLoginCount()).isEqualTo(0);
+            assertThat(userCaptor.getValue().getLockedUntil()).isNull();
+        }
+
+        @Test
+        @DisplayName("Should escalate to 30-min lockout after 10-min lockout expires and more failures")
+        void shouldEscalateTo30MinLockoutAfter10MinExpires() {
+            // 10-min lockout expired (failed count was 5, one more failure triggers 30-min)
+            testUser.setLockedUntil(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1));
+            testUser.setFailedLoginCount(5);
+            LoginRequest request = new LoginRequest("test@example.com", "wrongpassword");
+            when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+            when(passwordEncoder.matches("wrongpassword", "encodedPassword")).thenReturn(false);
+
+            assertThatThrownBy(() -> loginController.loginUser(request, httpRequest, httpResponse))
+                    .isInstanceOf(AuthenticationFailedException.class);
+
+            ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+            verify(userRepository).save(userCaptor.capture());
+            // Should be 6 (kept at 5, then incremented to 6)
+            assertThat(userCaptor.getValue().getFailedLoginCount()).isEqualTo(6);
+            // Should be locked for 30 minutes now
+            assertThat(userCaptor.getValue().getLockedUntil()).isNotNull();
+            assertThat(userCaptor.getValue().getLockedUntil())
+                    .isAfter(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(29));
+        }
+
+        @Test
+        @DisplayName("Should continue counting after 10-min lockout expires with new failure")
+        void shouldContinueCountingAfter10MinLockoutExpires() {
+            // 10-min lockout expired (failed count was 3)
+            testUser.setLockedUntil(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1));
+            testUser.setFailedLoginCount(3);
+            LoginRequest request = new LoginRequest("test@example.com", "wrongpassword");
+            when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+            when(passwordEncoder.matches("wrongpassword", "encodedPassword")).thenReturn(false);
+
+            assertThatThrownBy(() -> loginController.loginUser(request, httpRequest, httpResponse))
+                    .isInstanceOf(AuthenticationFailedException.class);
+
+            ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+            verify(userRepository).save(userCaptor.capture());
+            // Should be 4 (kept at 3, then incremented to 4)
+            assertThat(userCaptor.getValue().getFailedLoginCount()).isEqualTo(4);
+            // Should be locked for another 10 minutes (still in tier 1)
+            assertThat(userCaptor.getValue().getLockedUntil()).isNotNull();
+            assertThat(userCaptor.getValue().getLockedUntil())
+                    .isBefore(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(15));
+        }
     }
 }
+
 

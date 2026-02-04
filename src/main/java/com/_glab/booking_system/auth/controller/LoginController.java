@@ -84,10 +84,19 @@ public class LoginController {
             throw new AccountLockedException("Account is locked until " + user.getLockedUntil());
         }
 
-        // If lockout has expired, reset the failed counter to allow fresh lockout tiers
+        // If lockout has expired, clear the lockout timestamp
+        // Only reset failed counter after the 30-minute lockout (6+ failures) to enable tiered escalation
         boolean lockoutExpired = user.getLockedUntil() != null && user.getLockedUntil().isBefore(now);
         if (lockoutExpired) {
-            user.setFailedLoginCount(0);
+            int failedCount = user.getFailedLoginCount() != null ? user.getFailedLoginCount() : 0;
+            if (failedCount >= 6) {
+                // After 30-minute lockout, reset counter completely
+                user.setFailedLoginCount(0);
+                log.debug("30-minute lockout expired for {}, resetting failed counter", email);
+            } else {
+                // After 10-minute lockout (3-5 failures), keep counter to enable escalation to 30-min
+                log.debug("10-minute lockout expired for {}, keeping failed count at {}", email, failedCount);
+            }
             user.setLockedUntil(null);
         }
 
