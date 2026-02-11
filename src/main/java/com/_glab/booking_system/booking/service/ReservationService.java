@@ -182,8 +182,8 @@ public class ReservationService {
             try {
                 ReservationResponse response = createSingleReservation(occurrenceRequest, user, recurringGroupId);
                 reservationResponses.add(response);
-            } catch (IllegalArgumentException e) {
-                // Log and skip invalid dates (e.g., lab closed)
+            } catch (LabClosedException | OutsideOperatingHoursException | InvalidReservationTimeException e) {
+                // Skip this occurrence; date is invalid (lab closed, outside hours, or invalid time)
                 log.warn("Skipping occurrence on {}: {}", date, e.getMessage());
             }
         }

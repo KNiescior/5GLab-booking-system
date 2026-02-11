@@ -25,12 +25,12 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
  * Security configuration for the application.
- * 
+ * <p>
  * Configuration options (via application.yml or environment variables):
  * - CORS: Set CORS_ALLOWED_ORIGINS to comma-separated list of allowed origins
  * - CSRF: Set CSRF_ENABLED=true to enable CSRF protection (for cookie-based auth)
  * - Rate Limiting: Configure via RATE_LIMIT_* environment variables
- * 
+ * <p>
  * Production checklist:
  * - Set CORS_ALLOWED_ORIGINS to your frontend domain(s)
  * - Review which /buildings/** and /labs/** should require auth
@@ -67,18 +67,18 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        
+
         AppProperties.Cors corsProps = appProperties.getCors();
         configuration.setAllowedOrigins(corsProps.getAllowedOrigins());
         configuration.setAllowedMethods(corsProps.getAllowedMethods());
         configuration.setAllowedHeaders(corsProps.getAllowedHeaders());
         configuration.setAllowCredentials(corsProps.isAllowCredentials());
         configuration.setMaxAge(corsProps.getMaxAge());
-        
+
         // Expose headers that frontend might need
         configuration.addExposedHeader("X-RateLimit-Remaining");
         configuration.addExposedHeader("Retry-After");
-        
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
@@ -125,12 +125,12 @@ public class SecurityConfig {
             // Use cookie-based CSRF token for SPA compatibility
             CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
             requestHandler.setCsrfRequestAttributeName("_csrf");
-            
+
             http.csrf(csrf -> csrf
                     .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                     .csrfTokenRequestHandler(requestHandler)
                     .ignoringRequestMatchers(
-                            // Ignore CSRF for stateless API endpoints that use JWT
+                            // Ignore CSRF for stateless API endpoints that use JWT only
                             "/api/v1/auth/login",
                             "/api/v1/auth/refresh",
                             "/api/v1/auth/logout"

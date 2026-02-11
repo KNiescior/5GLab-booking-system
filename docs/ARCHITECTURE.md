@@ -84,6 +84,7 @@ sequenceDiagram
     participant LoginController
     participant MfaService
     participant MfaController
+    participant EmailOtpService
 
     Client->>LoginController: POST /login {email, password}
     Note over LoginController: Verify password (success)
@@ -94,9 +95,20 @@ sequenceDiagram
     LoginController->>MfaService: generateMfaToken()
     LoginController-->>Client: 200 OK {mfaToken}
     
-    Client->>MfaController: POST /mfa/verify {mfaToken, code}
-    MfaController->>MfaService: parseMfaToken()
-    MfaController->>MfaService: verifyTotp()
+    alt Option 1: TOTP (Authenticator App)
+        Client->>MfaController: POST /mfa/verify {mfaToken, code, codeType: TOTP}
+        MfaController->>MfaService: verifyTotp()
+    else Option 2: Email OTP (Fallback)
+        Client->>MfaController: POST /mfa/email-code {mfaToken}
+        MfaController->>EmailOtpService: generateAndSendOtp()
+        MfaController-->>Client: 200 OK {sent: true}
+        Note over Client: User receives email with code
+        Client->>MfaController: POST /mfa/verify {mfaToken, code, codeType: EMAIL}
+        MfaController->>EmailOtpService: verifyOtp()
+    else Option 3: Backup Code (Emergency)
+        Client->>MfaController: POST /mfa/verify {mfaToken, code, codeType: BACKUP}
+        MfaController->>MfaController: verifyAndConsumeBackupCode()
+    end
     
     MfaController-->>Client: 200 OK {accessToken}<br/>Set-Cookie: refreshToken=...
 ```

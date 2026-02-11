@@ -12,3 +12,5 @@ public class ErrorResponse {
     private ErrorResponseCode status;
     private String message;
 }
+
+

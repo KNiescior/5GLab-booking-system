@@ -10,6 +10,16 @@ This document tracks planned features and improvements for the 5GLab Booking Sys
   - Requires: current password verification, new password validation
   - Update `passwordChangedAt` timestamp
 
+- [ ] **Email-only MFA setup option** - Allow users to set up MFA with email OTP instead of authenticator app
+  - Alternative to TOTP for users who don't want to use authenticator apps
+  - New endpoint: `POST /api/v1/auth/mfa/setup/email` - Setup MFA with email as primary
+  - Sends verification email, user confirms with code to enable MFA
+  - Consider: less secure than TOTP (email can be compromised/delayed)
+  - Consider: should this be allowed for Admins/Lab Managers (mandatory MFA roles)?
+
+### Notifications
+- [ ] **Notify admins of every new reservation request** - Send the same "new reservation request" email to all admins when a reservation is submitted (like lab managers). Requires: `UserRepository.findByRole_Name(RoleName.ADMIN)` (or equivalent), then in `ReservationService.sendReservationEmails()` loop over admins and call `EmailService.sendNewReservationRequestEmail()` (or an admin-specific variant with `/admin/reservations` links).
+
 ### Reminder System
 - [ ] **8am reminder emails** - Send reminder email at 8am on the day of user's reservation
   - Requires: Spring `@Scheduled` task

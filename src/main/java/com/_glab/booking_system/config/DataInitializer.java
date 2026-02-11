@@ -1,23 +1,21 @@
 package com._glab.booking_system.config;
 
+import com._glab.booking_system.user.model.Role;
+import com._glab.booking_system.user.model.RoleName;
+import com._glab.booking_system.user.model.User;
+import com._glab.booking_system.user.repository.RoleRepository;
+import com._glab.booking_system.user.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import com._glab.booking_system.user.model.Role;
-import com._glab.booking_system.user.model.RoleName;
-import com._glab.booking_system.user.model.User;
-import com._glab.booking_system.user.repository.RoleRepository;
-import com._glab.booking_system.user.repository.UserRepository;
-
-import lombok.extern.slf4j.Slf4j;
-
 /**
  * Initializes the database with seed data for development/testing.
  * Only runs when "dev" profile is active.
- * 
+ * <p>
  * TODO (PRODUCTION): DELETE THIS ENTIRE FILE BEFORE DEPLOYMENT!
  * This file creates test users with known passwords which is a security risk.
  * Also delete any test users created in the database.
@@ -32,7 +30,7 @@ public class DataInitializer {
             UserRepository userRepository,
             RoleRepository roleRepository,
             PasswordEncoder passwordEncoder) {
-        
+
         return args -> {
             // Create roles if they don't exist
             for (RoleName roleName : RoleName.values()) {
@@ -41,7 +39,7 @@ public class DataInitializer {
                     role.setName(roleName);
                     role.setDescription(roleName.name() + " role");
                     roleRepository.save(role);
-                    log.info("Created role: {}", roleName);
+                    DataInitializer.log.info("Created role: {}", roleName);
                 }
             }
 
@@ -61,12 +59,12 @@ public class DataInitializer {
                 admin.setEnabled(true);
                 admin.setMfaEnabled(false); // Disable MFA for easy testing
                 userRepository.save(admin);
-                
-                log.info("===========================================");
-                log.info("Created test admin user:");
-                log.info("  Email: {}", adminEmail);
-                log.info("  Password: admin123");
-                log.info("===========================================");
+
+                DataInitializer.log.info("===========================================");
+                DataInitializer.log.info("Created test admin user:");
+                DataInitializer.log.info("  Email: {}", adminEmail);
+                DataInitializer.log.info("  Password: admin123");
+                DataInitializer.log.info("===========================================");
             }
 
             // Create a professor user for testing
@@ -85,11 +83,11 @@ public class DataInitializer {
                 professor.setEnabled(true);
                 professor.setMfaEnabled(false);
                 userRepository.save(professor);
-                
-                log.info("Created test professor user:");
-                log.info("  Email: {}", professorEmail);
-                log.info("  Password: prof123");
-                log.info("===========================================");
+
+                DataInitializer.log.info("Created test professor user:");
+                DataInitializer.log.info("  Email: {}", professorEmail);
+                DataInitializer.log.info("  Password: prof123");
+                DataInitializer.log.info("===========================================");
             }
         };
     }
@@ -120,8 +118,13 @@ public class DataInitializer {
             anonymous.setEnabled(false);
             anonymous.setIsAnonymous(true);
             userRepository.save(anonymous);
-            log.info("Created anonymous system user (placeholder for deleted accounts)");
+            DataInitializer.log.info("Created anonymous system user (placeholder for deleted accounts)");
         };
     }
 }
+
+
+
+
+
 
